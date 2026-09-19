@@ -102,6 +102,7 @@ jobs:
           echo "ghcr.io/zhangyxxyz/waline:$VERSION" >> "$GITHUB_STEP_SUMMARY"
           echo "ghcr.io/zhangyxxyz/waline@$DIGEST" >> "$GITHUB_STEP_SUMMARY"
       - name: Keep only the latest release cache group
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}

@@ -5,8 +5,15 @@ import os
 import subprocess
 
 
+def normalize_ref(ref):
+    # Cache API may wrap tag refs in refs/heads/.
+    if ref.startswith('refs/heads/refs/tags/'):
+        return ref[len('refs/heads/'):]
+    return ref
+
+
 def release_cache(entry):
-    return entry['ref'].startswith('refs/tags/v') and (
+    return normalize_ref(entry['ref']).startswith('refs/tags/v') and (
         entry['key'].startswith('buildkit-blob-')
         or entry['key'].startswith('index-waline-fork-')
     )
@@ -16,10 +23,10 @@ def candidates(entries, keep_ref):
     if not keep_ref.startswith('refs/tags/v'):
         raise ValueError('Expected a release tag ref')
     # A complete cache is an index plus multiple layer blobs, not one entry.
-    if not any(e['ref'] == keep_ref and e['key'].startswith('index-waline-fork-')
+    if not any(normalize_ref(e['ref']) == keep_ref and e['key'].startswith('index-waline-fork-')
                for e in entries):
         raise RuntimeError('New cache index missing; retaining previous caches')
-    return [e for e in entries if release_cache(e) and e['ref'] != keep_ref]
+    return [e for e in entries if release_cache(e) and normalize_ref(e['ref']) != keep_ref]
 
 
 def main():
