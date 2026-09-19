@@ -14,7 +14,7 @@ env:
   DOCKER_BUILD_RECORD_UPLOAD: 'false'
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: seiun-waline-release
   cancel-in-progress: false
 
 jobs:
@@ -24,6 +24,7 @@ jobs:
     permissions:
       contents: write
       packages: write
+      actions: write
     steps:
       - uses: actions/checkout@v7
         with:
@@ -41,6 +42,8 @@ jobs:
             echo 'Release tags must point to commits on dev'; exit 1;
           }
       - uses: docker/setup-qemu-action@v4
+        with:
+          cache-image: false
       - uses: docker/setup-buildx-action@v4
       - name: Build and test tagged source
         uses: docker/build-push-action@v7
@@ -51,7 +54,6 @@ jobs:
           load: true
           tags: waline-smoke:${{ github.sha }}
           cache-from: type=gha,scope=waline-fork
-          cache-to: type=gha,mode=max,scope=waline-fork
       - name: Smoke test packaged assets
         env:
           IMAGE: waline-smoke:${{ github.sha }}
@@ -99,6 +101,12 @@ jobs:
           echo '### 1Panel image' >> "$GITHUB_STEP_SUMMARY"
           echo "ghcr.io/zhangyxxyz/waline:$VERSION" >> "$GITHUB_STEP_SUMMARY"
           echo "ghcr.io/zhangyxxyz/waline@$DIGEST" >> "$GITHUB_STEP_SUMMARY"
+      - name: Keep only the latest release cache group
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          KEEP_CACHE_REF: ${{ github.ref }}
+        run: python3 scripts/cleanup-release-caches.py
       - name: Publish release notes
         env:
           GH_TOKEN: ${{ github.token }}
