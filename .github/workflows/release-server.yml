@@ -1,4 +1,4 @@
-name: Publish fork Docker image
+name: Publish @seiun/waline
 
 # Only pushing an explicit version tag publishes images.
 on:
@@ -10,6 +10,9 @@ on:
 permissions:
   contents: read
 
+env:
+  DOCKER_BUILD_RECORD_UPLOAD: 'false'
+
 concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
@@ -19,21 +22,27 @@ jobs:
     if: github.repository == 'zhangyxXyz/waline' && startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
       packages: write
     steps:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
+          fetch-depth: 0
       - name: Validate version tag
         env:
           VERSION: ${{ github.ref_name }}
         shell: bash
         run: |
-          [[ "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9]+([.-][a-zA-Z0-9]+)*)?$ ]] || {
-            echo 'Use a version such as v1.0.0 or v1.0.0-rc.1'; exit 1;
+          [[ "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-seiun$ ]] || {
+            echo 'Use a version such as v1.41.6-seiun'; exit 1;
+          }
+          git merge-base --is-ancestor HEAD origin/dev || {
+            echo 'Release tags must point to commits on dev'; exit 1;
           }
       - uses: docker/setup-qemu-action@v4
+        with:
+          cache-image: false
       - uses: docker/setup-buildx-action@v4
       - name: Build and test tagged source
         uses: docker/build-push-action@v7
@@ -43,8 +52,6 @@ jobs:
           platforms: linux/amd64
           load: true
           tags: waline-smoke:${{ github.sha }}
-          cache-from: type=gha,scope=waline-fork
-          cache-to: type=gha,mode=max,scope=waline-fork
       - name: Smoke test packaged assets
         env:
           IMAGE: waline-smoke:${{ github.sha }}
@@ -82,8 +89,6 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha,scope=waline-fork
-          cache-to: type=gha,mode=max,scope=waline-fork
       - name: Record deployment reference
         env:
           DIGEST: ${{ steps.publish.outputs.digest }}
@@ -92,3 +97,32 @@ jobs:
           echo '### 1Panel image' >> "$GITHUB_STEP_SUMMARY"
           echo "ghcr.io/zhangyxxyz/waline:$VERSION" >> "$GITHUB_STEP_SUMMARY"
           echo "ghcr.io/zhangyxxyz/waline@$DIGEST" >> "$GITHUB_STEP_SUMMARY"
+      - name: Publish release notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          DIGEST: ${{ steps.publish.outputs.digest }}
+          VERSION: ${{ github.ref_name }}
+        shell: bash
+        run: |
+          cat > "$RUNNER_TEMP/release-notes.md" <<EOF
+          ## Seiun Waline
+
+          Image: \`ghcr.io/zhangyxxyz/waline:$VERSION\`
+
+          1Panel pinned image: \`ghcr.io/zhangyxxyz/waline@$DIGEST\`
+
+          Platforms: linux/amd64, linux/arm64.
+          EOF
+          if gh release view "$VERSION" >/dev/null 2>&1; then
+            gh release edit "$VERSION" --title "$VERSION" --notes-file "$RUNNER_TEMP/release-notes.md"
+          else
+            gh release create "$VERSION" --verify-tag --title "$VERSION" --notes-file "$RUNNER_TEMP/release-notes.md"
+          fi
+      - name: Clean temporary runner data
+        if: always()
+        env:
+          IMAGE: waline-smoke:${{ github.sha }}
+        run: |
+          docker image rm "$IMAGE" || true
+          docker buildx prune --all --force || true

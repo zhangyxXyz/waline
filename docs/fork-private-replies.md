@@ -34,21 +34,21 @@
 
 ## 发布流程
 
-`.github/workflows/release-server.yml` 只在推送 `v*` 标签时触发，进一步校验版本格式，例如 `v1.41.6-seiun.1`。日常分支推送不会发布镜像；普通测试工作流仍可运行。原有 npm 和 Docker Hub 发布路径在本 fork 中不运行。
+`.github/workflows/release-server.yml` 只在推送 `v*` 标签时触发，进一步校验版本格式，例如 `v1.41.6-seiun`。日常分支推送不会发布镜像；普通测试工作流仍可运行。原有 npm 和 Docker Hub 发布路径在本 fork 中不运行。
 
 确认代码已审查并提交到准备发布的提交后，手动创建、推送一个未使用的标签。例如以下命令仅用于将来的正式发布：
 
 ```bash
-git tag -a v1.41.6-seiun.1 -m "Private replies: first fork release"
-git push origin v1.41.6-seiun.1
+git tag -a v1.41.6-seiun -m "Private replies: first fork release"
+git push origin v1.41.6-seiun
 ```
 
-标签可以直接指向本地 `dev` 上的提交，因此无需为了发布在远端创建 `dev`。不要重用已经发布的版本标签。
+`main` 与上游 `main` 保持完全一致；定制代码保存在远端 `dev`，默认分支为 `dev`。标签从经过验证的 `dev` 提交创建。不要重用已经发布的版本标签。
 
 Actions 会完成依赖安装、测试、管理后台／API／客户端构建，启动镜像检查静态资源，然后发布 `linux/amd64` 和 `linux/arm64` 镜像：
 
 ```text
-ghcr.io/zhangyxxyz/waline:v1.41.6-seiun.1
+ghcr.io/zhangyxxyz/waline:v1.41.6-seiun
 ```
 
 同时附带提交 SHA 标签。没有自动更新的 `latest` 标签。工作流摘要会列出镜像 digest，1Panel 可使用 `ghcr.io/zhangyxxyz/waline@sha256:...` 精确锁定一次构建。
@@ -84,4 +84,12 @@ pnpm run build
 
 私密回复集成测试运行真实 HTTP 鉴权、控制器、MySQL 存储适配器和 WHERE 编译器，使用独立的内存 SQL 数据库执行查询，不连接生产库。它覆盖访问角色、数量／分页、RSS、后台导出、写入、修改与删除限制。它不替代上线前对实际 MySQL 5.7 备份副本执行迁移的验收。
 
-本机已检查打包依赖、启动打包后的服务端、读取三份资源及工作流静态校验。本机没有 Docker，首次 Actions 的容器构建与启动检查仍是正式发布前的验证步骤；当前未推送代码、创建版本标签或发布镜像。
+本机已检查打包依赖、启动打包后的服务端、读取三份资源及工作流静态校验。本机没有 Docker，首次 Actions 的容器构建与启动检查仍是正式发布前的验证步骤；调试用的旧标签已清理；当前发布暂停，服务器尚未升级。
+
+## 存储和工作流清理
+
+发布工作流名称为 `Publish @seiun/waline`。只接受 `vX.Y.Z-seiun` 标签；手动重试也必须选择对应标签，普通分支不能发布。后续版本递增版本号，不追加发布尝试次数。
+
+镜像直接构建并上传 GHCR。成功后创建正式 GitHub Release，记录镜像标签和 digest。本流程没有跨任务文件传递，不创建临时 Release 草稿，也不上传 Actions 构建记录或 GHA 构建缓存。临时构建数据在 runner 内清理，runner 结束后销毁；最终 GHCR 镜像和正式 Release 保留。
+
+`Delete old workflow runs` 每周日北京时间 08:00 清理：每个工作流保留最近 6 次运行，且保留所有不足 30 天和仍在运行的任务。手动运行默认仅预览；修改清理脚本触发的运行也仅预览。删除历史运行不会删除正式 Release 或 GHCR 镜像。
