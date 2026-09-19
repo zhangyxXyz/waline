@@ -1,4 +1,11 @@
 const BaseRest = require('./rest.js');
+const regionSettings = require('../service/region-settings.js');
+
+const currentRegionSettings = () =>
+  regionSettings.read({
+    level: think.config('disableRegion') ? 'off' : think.config('regionLevel') || 'province',
+    country: Boolean(think.config('regionShowCountry')),
+  });
 const {
   active,
   same,
@@ -68,10 +75,11 @@ const formatCmt = async (
   }
 
   // administrator can always show region
-  if (isAdmin || !think.config('disableRegion')) {
+  const region = currentRegionSettings();
+  if (isAdmin || region.level !== 'off') {
     comment.addr = await think.ip2region(ip, {
-      level: isAdmin ? 'isp' : think.config('regionLevel') || 'province',
-      country: isAdmin || Boolean(think.config('regionShowCountry')),
+      level: isAdmin ? 'isp' : region.level,
+      country: isAdmin || region.country,
     });
   }
 
@@ -101,6 +109,11 @@ module.exports = class CommentController extends BaseRest {
   }
 
   async getAction() {
+    if (this.get('type') === 'region-settings') {
+      if (this.ctx.state.userInfo?.type !== 'administrator') return this.ctx.throw(403);
+      this.ctx.set('Cache-Control', 'private, no-store');
+      return this.success(currentRegionSettings());
+    }
     this.ctx.set('Cache-Control', 'private, no-store');
     const { type } = this.get();
 
@@ -372,6 +385,10 @@ module.exports = class CommentController extends BaseRest {
   }
 
   async putAction() {
+    if (this.get('type') === 'region-settings') {
+      if (this.ctx.state.userInfo?.type !== 'administrator') return this.ctx.throw(403);
+      return this.success(regionSettings.write(this.post()));
+    }
     const { userInfo } = this.ctx.state;
     const isAdmin = userInfo.type === 'administrator';
     // Ownership, audience and topology are immutable even for administrators.

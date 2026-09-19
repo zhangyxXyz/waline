@@ -1110,3 +1110,65 @@ button.operate-reply {
     left: 16px;
   }
 }
+.waline-region-settings {
+  margin: 0 0 20px;
+  padding: 14px 18px;
+  border: 1px solid #dce5f2;
+  border-radius: 14px;
+}
+.waline-region-settings summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.waline-region-settings-fields {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+  padding-top: 16px;
+}
+.waline-region-settings-fields small {
+  flex-basis: 100%;
+}
+.waline-region-settings output {
+  display: block;
+  margin-top: 8px;
+}
+.waline-management-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px;
+  margin-bottom: 24px;
+  border: 1px solid #dce5f2;
+  border-radius: 18px;
+  background: #f4f7fc;
+}
+.waline-management-tabs button {
+  border: 0;
+  border-radius: 12px;
+  padding: 12px 20px;
+  background: transparent;
+  color: #617187;
+  font-weight: 600;
+  cursor: pointer;
+}
+.waline-management-tabs button[aria-pressed='true'] {
+  background: #fff;
+  color: #006aff;
+  box-shadow: 0 4px 16px rgb(25 60 110 / 8%);
+}
+.waline-ip-panel {
+  width: 100%;
+  padding: 0 15px;
+  box-sizing: border-box;
+}
+.waline-region-audit-card {
+  padding: 18px;
+  border: 1px solid #dce5f2;
+  border-radius: 14px;
+}
+.waline-region-settings h3,
+.waline-region-audit-card h3 {
+  margin-top: 0;
+}

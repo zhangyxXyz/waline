@@ -1,5 +1,6 @@
 const IP2Region = require('ip2region').default;
 const parser = require('ua-parser-js');
+const path = require('node:path');
 const { formatRegion } = require('../service/region-format.js');
 
 const preventMessage = 'PREVENT_NEXT_PROCESS';
@@ -13,7 +14,10 @@ const getIP2RegionInstance = (() => {
   return () => {
     if (!instance) {
       instance = new IP2Region({
-        ipv4db: process.env.IP2REGION_DB_V4 || process.env.IP2REGION_DB,
+        ipv4db:
+          process.env.IP2REGION_DB_V4 ||
+          process.env.IP2REGION_DB ||
+          path.resolve(__dirname, '../../data/ip2region-v4.db'),
         ipv6db: process.env.IP2REGION_DB_V6,
       });
     }

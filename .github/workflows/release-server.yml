@@ -61,6 +61,7 @@ jobs:
         run: |
           container=$(docker run -d -e MYSQL_DB=smoke -e JWT_TOKEN=smoke-test "$IMAGE")
           trap 'docker logs "$container"; docker rm -f "$container"' EXIT
+          docker exec "$container" node -e "const R=require('ip2region').default; const r=new R({ipv4db:'/app/data/ip2region-v4.db'}).search('43.132.141.24'); if(r.country!=='中国'||r.province!=='香港特别行政区')process.exit(1)"
           for attempt in $(seq 1 30); do
             if docker exec "$container" node -e "Promise.all(['waline.js','waline.css','admin.js'].map(async file => {const r=await fetch('http://localhost:8360/assets/fork/'+file);if(!r.ok || !(await r.text()).length)throw Error(file);})).catch(()=>process.exit(1))"; then
               exit 0
@@ -131,6 +132,8 @@ jobs:
           - Signed-in visitors can send top-level private messages to the site owner. Subsequent replies retain the same two participants; site administrators can moderate them (MySQL required).
           - With multiple administrators, set PRIVATE_MESSAGE_ADMIN_ID to select the site owner. Anonymous private messages and client-supplied recipients are rejected.
           - Configurable IP region precision and country prefix; raw IP addresses remain administrator-only.
+          - Updated the bundled IPv4 database from a pinned upstream dataset, correcting the reported Tencent Hong Kong address. IPv6 data is unchanged.
+          - A dedicated IP management tab combines the region audit and administrator-only region settings. Saved settings apply immediately.
           - The region audit button is placed in the comment-management header. Results appear in a dismissible toast and disappear after eight seconds.
           - The LeanCloud migration notice is shown only for LeanCloud storage.
           - Matching administrator and comment-client assets are bundled under /assets/fork/.
@@ -138,6 +141,7 @@ jobs:
           ### Deployment
           Back up the database before applying assets/migrations/001-private-replies.mysql.sql on an existing installation. Skip this migration if it has already been applied.
           Do not roll back to a server that ignores visibility fields after private replies have been created.
+          Persist /app/runtime using a writable host mount so dashboard region settings survive container recreation. Saved dashboard settings override environment defaults.
 
           This tag was intentionally reused for the dashboard update. Deployments pinned to the previous image digest remain unchanged until explicitly updated.
           EOF

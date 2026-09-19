@@ -1,8 +1,11 @@
+import fs from 'node:fs';
 // oxlint-disable vitest/no-hooks
 // Real HTTP authentication/controllers and MySQL WHERE compiler, with an
 // isolated in-memory SQL transport. No production services are contacted.
 import http from 'node:http';
 import { createRequire } from 'node:module';
+import os from 'node:os';
+import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -11,6 +14,8 @@ const require = createRequire(import.meta.url);
 process.env.MYSQL_DB = 'private_reply_test';
 process.env.JWT_TOKEN = 'private-reply-test-secret';
 process.env.IPQPS = '0';
+const regionDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'waline-region-test-'));
+process.env.REGION_SETTINGS_FILE = path.join(regionDirectory, 'settings.json');
 const main = require('../index.js');
 const jwt = require('jsonwebtoken');
 const { Parser } = require('think-model-mysql');
@@ -256,6 +261,8 @@ describe('private reply access', () => {
     delete process.env.MYSQL_DB;
     delete process.env.JWT_TOKEN;
     delete process.env.IPQPS;
+    delete process.env.REGION_SETTINGS_FILE;
+    fs.rmSync(regionDirectory, { recursive: true, force: true });
   });
 
   it.each([undefined, 3, 5])('hides content and existence from viewer %s', async (id) => {
@@ -308,6 +315,50 @@ describe('private reply access', () => {
     }
     const admin = await json('/api/comment?path=/post', 4);
     expect(admin.data.data[0].ip).toBe('127.0.0.1');
+  });
+
+  it('persists region settings for administrators and applies them to public reads', async () => {
+    for (const id of [undefined, 1, 5]) {
+      expect(
+        (await request('/api/comment?type=region-settings', id)).status,
+      ).toBeGreaterThanOrEqual(400);
+      expect(
+        (
+          await request('/api/comment?type=region-settings', id, 'PUT', {
+            level: 'city',
+            country: true,
+          })
+        ).status,
+      ).toBeGreaterThanOrEqual(400);
+    }
+    expect(
+      (
+        await json('/api/comment?type=region-settings', 4, 'PUT', {
+          level: 'invalid',
+          country: true,
+        })
+      ).errno,
+    ).not.toBe(0);
+    const saved = await json('/api/comment?type=region-settings', 4, 'PUT', {
+      level: 'province',
+      country: true,
+    });
+    expect(saved.errno).toBe(0);
+    expect(JSON.parse(fs.readFileSync(process.env.REGION_SETTINGS_FILE, 'utf8'))).toStrictEqual({
+      level: 'province',
+      country: true,
+    });
+    expect((await json('/api/comment?type=region-settings', 4)).data).toMatchObject({
+      level: 'province',
+      country: true,
+    });
+    db.prepare('UPDATE Comment SET ip=? WHERE id=1').run('43.132.141.24');
+    const listed = await json('/api/comment?path=/post');
+    expect(listed.data.data[0].addr).toBe('中国 香港特别行政区');
+    expect(listed.data.data[0]).not.toHaveProperty('ip');
+    await json('/api/comment?type=region-settings', 4, 'PUT', { level: 'off', country: true });
+    expect((await json('/api/comment?path=/post')).data.data[0]).not.toHaveProperty('addr');
+    fs.unlinkSync(process.env.REGION_SETTINGS_FILE);
   });
 
   it('creates a fixed audience and skips outgoing hooks', async () => {

@@ -23,6 +23,10 @@ module.exports = class CommentLogic extends Base {
     }
 
     switch (type) {
+      case 'region-settings': {
+        this.checkAdmin();
+        break;
+      }
       case 'region-audit': {
         this.checkAdmin();
         this.rules = {
@@ -120,6 +124,10 @@ module.exports = class CommentLogic extends Base {
   }
 
   async putAction() {
+    if (this.get('type') === 'region-settings') {
+      this.checkAdmin();
+      return;
+    }
     const { userInfo } = this.ctx.state;
     const data = this.post();
     const immutable = [

@@ -5,6 +5,7 @@ import { useSelector } from 'react-redux';
 
 import Header from '../../components/Header.jsx';
 import Paginator from '../../components/Paginator.jsx';
+import RegionSettings from '../../components/RegionSettings.jsx';
 import {
   auditCommentRegions,
   deleteComment,
@@ -37,6 +38,7 @@ export default function ManageComments() {
   const [commentIds, setCommentIds] = useState([]);
   const [regionBusy, setRegionBusy] = useState(false);
   const [regionReport, setRegionReport] = useState('');
+  const [activePanel, setActivePanel] = useState('comments');
 
   useEffect(() => {
     if (!regionReport || regionBusy) return;
@@ -306,22 +308,50 @@ export default function ManageComments() {
       )}
       <div className="main">
         <div className="body container">
-          <div className="typecho-page-title waline-comments-title">
-            <h2>{t('manage comments')}</h2>
-            {user?.type === 'administrator' && (
+          {user?.type === 'administrator' && (
+            <nav className="waline-management-tabs" aria-label="管理页签">
               <button
                 type="button"
-                className="btn waline-region-audit"
-                disabled={regionBusy}
-                onClick={auditRegions}
-                title="根据已保存的 IP 重新识别属地；缺少 IP 的评论无法补齐"
+                aria-pressed={activePanel === 'comments'}
+                onClick={() => setActivePanel('comments')}
               >
-                {regionBusy ? '正在识别属地…' : '识别 IP 属地'}
+                评论管理
               </button>
-            )}
+              <button
+                type="button"
+                aria-pressed={activePanel === 'ip'}
+                onClick={() => setActivePanel('ip')}
+              >
+                IP 地址管理
+              </button>
+            </nav>
+          )}
+          <div className="typecho-page-title waline-comments-title">
+            <h2>{activePanel === 'ip' ? 'IP 地址管理' : t('manage comments')}</h2>
           </div>
           <main className="row typecho-page-main">
-            <div className="col-mb-12 typecho-list">
+            {user?.type === 'administrator' && activePanel === 'ip' && (
+              <div className="waline-ip-panel">
+                <RegionSettings />
+                <section className="waline-region-audit-card">
+                  <h3>识别已有评论的属地</h3>
+                  <p>根据已保存的 IP 重新查询。缺少 IP 的历史评论无法补齐。</p>
+                  <button
+                    type="button"
+                    className="btn waline-region-audit"
+                    disabled={regionBusy}
+                    onClick={auditRegions}
+                    title="根据已保存的 IP 重新识别属地；缺少 IP 的评论无法补齐"
+                  >
+                    {regionBusy ? '正在识别属地…' : '一键识别 IP 属地'}
+                  </button>
+                </section>
+              </div>
+            )}
+            <div
+              className="col-mb-12 typecho-list"
+              style={{ display: activePanel === 'comments' ? undefined : 'none' }}
+            >
               <div className="clear-fix">
                 {FILTERS.map(([key, FILTER]) => (
                   <ul
