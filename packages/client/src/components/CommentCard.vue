@@ -92,6 +92,9 @@ const isEditingCurrent = computed(() => comment.objectId === edit?.objectId);
 
         <span v-else class="wl-nick">{{ comment.nick }}</span>
 
+        <span v-if="comment.visibility === 'private'" class="wl-badge">{{
+          locale.privateReply
+        }}</span>
         <span v-if="comment.label" class="wl-badge" v-text="comment.label" />
 
         <span v-if="comment['sticky']" class="wl-badge" v-text="locale.sticky" />
@@ -119,7 +122,7 @@ const isEditingCurrent = computed(() => comment.objectId === edit?.objectId);
             role="button"
             class="wl-rss"
             :title="locale.subscribeToReplies"
-            v-if="isOwner && !config.noRss"
+            v-if="isOwner && !config.noRss && comment.visibility !== 'private'"
             :href="`${config.serverURL}/api/comment/rss?user_id=${comment.user_id}`"
             target="_blank"
             rel="noopener noreferrer"
@@ -139,6 +142,7 @@ const isEditingCurrent = computed(() => comment.objectId === edit?.objectId);
 
           <button
             type="button"
+            v-if="comment.canReply !== false"
             class="wl-reply"
             :class="{ active: isReplyingCurrent }"
             :title="isReplyingCurrent ? locale.cancelReply : locale.reply"
@@ -212,6 +216,8 @@ const isEditingCurrent = computed(() => comment.objectId === edit?.objectId);
           :reply-id="reply?.objectId"
           :reply-user="comment.nick"
           :root-id="rootId"
+          :can-private-reply="comment.canPrivateReply"
+          :private-reply="comment.visibility === 'private'"
           @log="emit('log')"
           @cancel-reply="emit('reply', null)"
           @cancel-edit="emit('edit', null)"

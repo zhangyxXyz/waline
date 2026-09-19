@@ -103,5 +103,6 @@
   "avatar": "头像",
   "select": "选择",
   "select item": "选择项目",
-  "unbind": "解绑"
+  "unbind": "解绑",
+  "private reply": "私密回复 · 仅双方账户和管理员可见"
 }

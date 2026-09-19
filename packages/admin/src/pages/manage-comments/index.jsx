@@ -178,7 +178,7 @@ export default function ManageComments() {
       },
       {
         key: 'reply',
-        show: comment && comment.status === 'approved',
+        show: comment && comment.status === 'approved' && comment.canReply !== false,
         name: t('reply'),
         action() {
           const handler = {};
@@ -393,6 +393,8 @@ export default function ManageComments() {
                             sticky,
                             time,
                             insertedAt,
+                            visibility,
+                            canReply,
                           },
                           idx,
                         ) =>
@@ -542,6 +544,14 @@ export default function ManageComments() {
                                 </div>
                               </td>
                               <td style={{ verticalalign: 'top' }} className="comment-body">
+                                {visibility === 'private' && (
+                                  <strong>
+                                    {t('private reply', {
+                                      defaultValue:
+                                        'Private reply · participants and administrators only',
+                                    })}
+                                  </strong>
+                                )}
                                 <div className="comment-date">
                                   {formatDate(insertedAt ?? time)} {t('at')}{' '}
                                   <a href={getPostUrl(url)} target="_blank" rel="noreferrer">
@@ -594,6 +604,7 @@ export default function ManageComments() {
                                 ) : null}
                                 <div className="comment-action hidden-by-mouse">
                                   {createActions({
+                                    canReply,
                                     objectId,
                                     nick,
                                     status,

@@ -1,0 +1,22 @@
+# syntax=docker/dockerfile:1
+FROM node:24.20.0-bookworm AS build
+WORKDIR /source
+RUN npm install --global pnpm@12.3.1
+COPY . .
+RUN pnpm install --frozen-lockfile --store-dir /pnpm/store
+RUN pnpm exec vitest run && pnpm run build
+RUN pnpm --filter @waline/vercel deploy --prod --store-dir /pnpm/store /runtime
+RUN mkdir -p /runtime/public/fork && \
+    cp packages/admin/dist/admin.js /runtime/public/fork/admin.js && \
+    cp packages/client/dist/waline.js packages/client/dist/waline.css /runtime/public/fork/
+
+FROM node:24.20.0-bookworm-slim AS runtime
+WORKDIR /app
+ENV NODE_ENV=production TZ=Asia/Shanghai HOST=0.0.0.0
+ENV WALINE_ADMIN_MODULE_ASSET_URL=/assets/fork/admin.js
+COPY --from=build --chown=node:node /runtime/ /app/
+RUN mkdir -p /app/logs /app/runtime && chown -R node:node /app/logs /app/runtime
+USER node
+EXPOSE 8360
+CMD ["node", "vanilla.js"]
+

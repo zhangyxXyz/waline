@@ -2,6 +2,7 @@ const BaseRest = require('./rest.js');
 
 module.exports = class DBController extends BaseRest {
   async getAction() {
+    this.ctx.set('Cache-Control', 'private, no-store');
     const exportData = {
       type: 'waline',
       version: 1,
@@ -28,6 +29,12 @@ module.exports = class DBController extends BaseRest {
   async postAction() {
     const { table } = this.get();
     const item = this.post();
+    if (
+      String(table).toLowerCase() === 'comment' &&
+      (item.visibility === 'private' || item.private_user_a || item.private_user_b)
+    ) {
+      return this.fail(400, 'Private comments require an offline, identity-preserving restore');
+    }
     const storage = this.config('storage');
     const model = this.getModel(table);
 
@@ -52,6 +59,14 @@ module.exports = class DBController extends BaseRest {
   async putAction() {
     const { table, objectId } = this.get();
     const data = this.post();
+    if (
+      String(table).toLowerCase() === 'comment' &&
+      ['visibility', 'private_user_a', 'private_user_b', 'user_id', 'pid', 'rid', 'url'].some(
+        (key) => key in data,
+      )
+    ) {
+      return this.fail(400, 'Comment audience and ownership are immutable');
+    }
     const model = this.getModel(table);
 
     delete data.objectId;

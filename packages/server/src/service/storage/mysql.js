@@ -1,5 +1,6 @@
 const Base = require('./base.js');
 const { normalizeOrder, toSqlOrder } = require('./order.js');
+const { readPredicate } = require('../comment-privacy.js');
 
 module.exports = class extends Base {
   mapOrderField(field) {
@@ -22,6 +23,12 @@ module.exports = class extends Base {
     }
 
     for (const k in filter) {
+      if (k === '_privateViewer') {
+        // ThinkJS raw SQL condition, generated only from authenticated numeric IDs.
+        // oxlint-disable-next-line no-underscore-dangle
+        where._string = readPredicate(filter[k]);
+        continue;
+      }
       if (k === 'objectId' || k === 'objectid') {
         where.id = filter[k];
         continue;
@@ -116,7 +123,7 @@ module.exports = class extends Base {
 
         await this.model(this.tableName).where({ id: item.id }).update(updateData);
 
-        return { ...item, ...updateData };
+        return { ...item, ...updateData, objectId: item.id };
       }),
     );
   }

@@ -219,7 +219,7 @@ module.exports = class UserController extends BaseRest {
 
   async getUsersListByCount() {
     const { pageSize } = this.get();
-    const commentModel = this.getModel('Comment');
+    const commentModel = this.getModel('Comment', { publicOnly: true });
     const counts = await commentModel.count(
       {
         status: ['NOT IN', ['waiting', 'spam']],

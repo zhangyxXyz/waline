@@ -15,6 +15,9 @@ DROP TABLE IF EXISTS `wl_Comment`;
 CREATE TABLE `wl_Comment` (
   `id` int(11) unsigned NOT NULL AUTO_INCREMENT,
   `user_id` int(11) DEFAULT NULL,
+  `visibility` enum('public','private') NOT NULL DEFAULT 'public',
+  `private_user_a` int(11) unsigned DEFAULT NULL,
+  `private_user_b` int(11) unsigned DEFAULT NULL,
   `comment` text,
   `insertedAt` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `ip` varchar(100) DEFAULT '',

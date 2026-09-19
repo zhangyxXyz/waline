@@ -103,5 +103,6 @@
   "avatar": "頭像",
   "select": "選擇",
   "select item": "選擇項目",
-  "unbind": "解除綁定"
+  "unbind": "解除綁定",
+  "private reply": "私密回覆 · 僅雙方帳戶和管理員可見"
 }

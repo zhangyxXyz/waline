@@ -490,6 +490,8 @@ module.exports = class NotifyService extends think.Service {
   }
 
   async run(comment, parent, disableAuthorNotify = false) {
+    // Private conversations must not reach email templates or third-party relays.
+    if (comment.visibility === 'private' || parent?.visibility === 'private') return;
     const { AUTHOR_EMAIL, DISABLE_AUTHOR_NOTIFY } = process.env;
     const { mailSubject, mailTemplate, mailSubjectAdmin, mailTemplateAdmin } = think.config();
     const mailList = [];

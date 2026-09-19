@@ -8,6 +8,7 @@ const isTcb = think.env === 'cloudbase';
 const isAliyunFC = think.env === 'aliyun-fc' || Boolean(process.env.FC_RUNTIME_VERSION);
 
 module.exports = [
+  { handle: 'fork-assets' },
   {
     handle: 'fetch-oauth-service',
   },

@@ -4,7 +4,7 @@
 import { useStyleTag, watchImmediate } from '@vueuse/core';
 import type { WalineComment, WalineCommentStatus, WalineRootComment } from '@waline/api';
 import { deleteComment, getComment, updateComment } from '@waline/api';
-import { computed, onMounted, onUnmounted, provide, ref } from 'vue';
+import { computed, onMounted, onUnmounted, provide, ref, watch } from 'vue';
 
 import { useLikeStorage, useUserInfo } from '../composables/index.js';
 import { configKey, sortingMethods, sortKeyMap } from '../config/index.js';
@@ -63,6 +63,7 @@ const getCommentData = (pageNumber: number): void => {
     token: userInfo.value.token,
   })
     .then((resp) => {
+      if (controller.signal.aborted) return;
       status.value = 'success';
       count.value = resp.count;
       data.value.push(...resp.data);
@@ -71,7 +72,7 @@ const getCommentData = (pageNumber: number): void => {
     })
     // oxlint-disable-next-line promise/prefer-await-to-callbacks
     .catch((err: unknown) => {
-      if ((err as Error).name !== 'AbortError') {
+      if (!controller.signal.aborted && (err as Error).name !== 'AbortError') {
         // oxlint-disable-next-line no-console
         console.error((err as Error).message);
         status.value = 'error';
@@ -87,9 +88,22 @@ const loadMore = (): void => {
 
 const refreshComments = (): void => {
   count.value = 0;
+  reply.value = null;
+  edit.value = null;
   data.value = [];
   getCommentData(1);
 };
+
+watch(
+  () => userInfo.value.token,
+  () => {
+    abort?.();
+    reply.value = null;
+    edit.value = null;
+    refreshComments();
+  },
+  { flush: 'sync' },
+);
 
 const onSortByChange = (item: WalineCommentSorting): void => {
   if (commentSortingRef.value !== item) {

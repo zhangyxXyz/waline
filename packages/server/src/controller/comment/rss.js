@@ -50,7 +50,7 @@ const setRssResponse = (ctx, xml) => {
 module.exports = class extends BaseRest {
   constructor(ctx) {
     super(ctx);
-    this.modelInstance = this.getModel('Comment');
+    this.modelInstance = this.getModel('Comment', { publicOnly: true });
   }
 
   async getAction() {

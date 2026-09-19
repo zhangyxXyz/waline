@@ -1,93 +1,93 @@
-name: 'publish @waline/vercel'
+name: Publish fork Docker image
 
+# Only pushing an explicit version tag publishes images.
 on:
-  workflow_dispatch:
   push:
-    branches:
-      - main
-    paths:
-      - .github/workflows/release-server.yml
-      - packages/server/**
+    tags:
+      - 'v*'
 
 permissions:
   contents: read
-  id-token: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
-  npm:
-    runs-on: ubuntu-latest
-    outputs:
-      old-version: ${{ steps.get-version.outputs.old-version }}
-      version: ${{ steps.get-version.outputs.version }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v6
-
-      - name: Install Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: 24
-          check-latest: true
-          cache: pnpm
-
-      - name: Install Dependencies
-        run: pnpm ci
-
-      - name: Get version
-        id: get-version
-        shell: bash
-        run: |
-          LOCAL_VERSION=$(node -p "require('./packages/server/package.json').version")
-          REMOTE_VERSION=$(pnpm view @waline/vercel version 2>/dev/null || echo "none")
-
-          echo "version=$LOCAL_VERSION" >> $GITHUB_OUTPUT
-          echo "old-version=$REMOTE_VERSION" >> $GITHUB_OUTPUT
-
-      - name: Publish
-        run: pnpm publish -r --filter @waline/vercel --no-git-checks
-
   docker:
-    needs: npm
-    if: ${{ needs.npm.outputs.old-version != needs.npm.outputs.version || github.event_name == 'workflow_dispatch' }}
+    if: github.repository == 'zhangyxXyz/waline'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     steps:
       - uses: actions/checkout@v7
         with:
-          fetch-depth: 0
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v4
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
-
-      - name: Login to Docker Hub
-        uses: docker/login-action@v4
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Build and push alpine
+          persist-credentials: false
+      - name: Validate version tag
+        env:
+          VERSION: ${{ github.ref_name }}
+        shell: bash
+        run: |
+          [[ "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9]+([.-][a-zA-Z0-9]+)*)?$ ]] || {
+            echo 'Use a version such as v1.0.0 or v1.0.0-rc.1'; exit 1;
+          }
+      - uses: docker/setup-qemu-action@v4
+      - uses: docker/setup-buildx-action@v4
+      - name: Build and test tagged source
         uses: docker/build-push-action@v7
         with:
           context: .
-          file: ./packages/server/Dockerfile.alpine
-          platforms: linux/amd64,linux/arm64/v8
-          push: true
+          file: packages/server/Dockerfile.fork
+          platforms: linux/amd64
+          load: true
+          tags: waline-smoke:${{ github.sha }}
+          cache-from: type=gha,scope=waline-fork
+          cache-to: type=gha,mode=max,scope=waline-fork
+      - name: Smoke test packaged assets
+        env:
+          IMAGE: waline-smoke:${{ github.sha }}
+        shell: bash
+        run: |
+          container=$(docker run -d -e MYSQL_DB=smoke -e JWT_TOKEN=smoke-test "$IMAGE")
+          trap 'docker logs "$container"; docker rm -f "$container"' EXIT
+          for attempt in $(seq 1 30); do
+            if docker exec "$container" node -e "Promise.all(['waline.js','waline.css','admin.js'].map(async file => {const r=await fetch('http://localhost:8360/assets/fork/'+file);if(!r.ok || !(await r.text()).length)throw Error(file);})).catch(()=>process.exit(1))"; then
+              exit 0
+            fi
+            sleep 2
+          done
+          exit 1
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/metadata-action@v6
+        id: meta
+        with:
+          images: ghcr.io/zhangyxxyz/waline
+          flavor: latest=false
           tags: |
-            lizheming/waline:alpine
-            lizheming/waline:${{ needs.npm.outputs.version }}-alpine
-
-      - name: Build and push debian
+            type=ref,event=tag
+            type=sha,format=long
+      - name: Publish versioned image
+        id: publish
         uses: docker/build-push-action@v7
         with:
           context: .
-          file: ./packages/server/Dockerfile
-          platforms: linux/amd64,linux/arm64/v8
+          file: packages/server/Dockerfile.fork
+          platforms: linux/amd64,linux/arm64
           push: true
-          tags: |
-            lizheming/waline:latest
-            lizheming/waline:${{ needs.npm.outputs.version }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=waline-fork
+          cache-to: type=gha,mode=max,scope=waline-fork
+      - name: Record deployment reference
+        env:
+          DIGEST: ${{ steps.publish.outputs.digest }}
+          VERSION: ${{ github.ref_name }}
+        run: |
+          echo '### 1Panel image' >> "$GITHUB_STEP_SUMMARY"
+          echo "ghcr.io/zhangyxxyz/waline:$VERSION" >> "$GITHUB_STEP_SUMMARY"
+          echo "ghcr.io/zhangyxxyz/waline@$DIGEST" >> "$GITHUB_STEP_SUMMARY"

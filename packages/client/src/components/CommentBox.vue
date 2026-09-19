@@ -5,7 +5,17 @@ import type { WalineComment, WalineCommentData, UserInfo } from '@waline/api';
 import { addComment, login, updateComment } from '@waline/api';
 import autosize from 'autosize';
 import type { DeepReadonly, CSSProperties } from 'vue';
-import { computed, inject, nextTick, onMounted, reactive, ref, useTemplateRef, watch } from 'vue';
+import {
+  computed,
+  inject,
+  nextTick,
+  onMounted,
+  onUnmounted,
+  reactive,
+  ref,
+  useTemplateRef,
+  watch,
+} from 'vue';
 
 import {
   useEditor,
@@ -37,7 +47,7 @@ import {
 } from './Icons.js';
 import ImageWall from './ImageWall.vue';
 
-// oxlint-disable-next-line vue/define-props-destructuring
+// oxlint-disable-next-line vue/define-props-destructuring, vue/max-props
 const props = defineProps<{
   /** Current comment to be edited */
   edit?: WalineComment | null;
@@ -47,6 +57,8 @@ const props = defineProps<{
   replyId?: number;
   /** User name to be replied */
   replyUser?: string;
+  canPrivateReply?: boolean;
+  privateReply?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -57,7 +69,31 @@ const emit = defineEmits<{
 // oxlint-disable-next-line typescript/no-non-null-assertion
 const config = inject(configKey)!;
 
-const editor = useEditor();
+const savedEditor = useEditor();
+// Private drafts stay in component memory; public drafts retain existing persistence.
+const privateDraft = ref('');
+let unmounted = false;
+onUnmounted(() => {
+  unmounted = true;
+  privateDraft.value = '';
+});
+const privateSelected = ref(false);
+const isPrivate = computed(
+  () => props.privateReply || props.edit?.visibility === 'private' || privateSelected.value,
+);
+const privateChoice = computed({
+  get: () => Boolean(isPrivate.value),
+  set: (value: boolean) => {
+    if (!props.privateReply) privateSelected.value = value;
+  },
+});
+const editor = computed({
+  get: () => (isPrivate.value ? privateDraft.value : savedEditor.value),
+  set: (value: string) => {
+    if (isPrivate.value) privateDraft.value = value;
+    else savedEditor.value = value;
+  },
+});
 const userMeta = useUserMeta();
 const userInfo = useUserInfo();
 
@@ -105,6 +141,15 @@ const onEmojiLeave = (): void => {
 const showGif = ref(false);
 const showPreview = ref(false);
 const previewText = ref('');
+watch(
+  () => userInfo.value.token,
+  () => {
+    privateDraft.value = '';
+    previewText.value = '';
+    privateSelected.value = false;
+  },
+  { flush: 'sync' },
+);
 const wordNumber = ref(0);
 
 const searchResults = reactive({
@@ -125,7 +170,7 @@ const locale = computed(() => config.value.locale);
 
 const isLogin = computed(() => Boolean(userInfo.value.token));
 
-const canUploadImage = computed(() => config.value.imageUploader != null);
+const canUploadImage = computed(() => !isPrivate.value && config.value.imageUploader != null);
 
 const insert = (text: string): void => {
   // oxlint-disable-next-line typescript/no-non-null-assertion
@@ -142,6 +187,7 @@ const insert = (text: string): void => {
 };
 
 const uploadImage = async (file: File): Promise<void> => {
+  if (!canUploadImage.value) return;
   const uploadText = `![${config.value.locale.uploading} ${file.name}]()`;
 
   insert(uploadText);
@@ -203,6 +249,7 @@ const syncUserMeta = ({ link, mail, nick }: Partial<WalineCommentData>): void =>
 
 // oxlint-disable-next-line complexity, max-statements
 const submitComment = async (): Promise<void> => {
+  const submitToken = userInfo.value.token;
   const { serverURL, lang, login, wordLimit, requiredMeta, recaptchaV3Key, turnstileKey } =
     config.value;
 
@@ -279,6 +326,7 @@ const submitComment = async (): Promise<void> => {
     comment.pid = props.replyId;
     comment.rid = props.rootId;
     comment.at = props.replyUser;
+    if (!props.edit && isPrivate.value) comment.visibility = 'private';
   }
 
   isSubmitting.value = true;
@@ -292,11 +340,12 @@ const submitComment = async (): Promise<void> => {
       comment.turnstile = await useTurnstile(turnstileKey).execute('social');
     }
 
+    if (unmounted || submitToken !== userInfo.value.token) return;
     const options = {
       serverURL,
       lang,
       token: userInfo.value.token,
-      comment,
+      comment: props.edit ? { comment: comment.comment } : comment,
     };
 
     const response = await (props.edit
@@ -304,10 +353,11 @@ const submitComment = async (): Promise<void> => {
           objectId: props.edit.objectId,
           ...options,
         })
-      : addComment(options));
+      : addComment({ ...options, comment }));
 
     isSubmitting.value = false;
 
+    if (unmounted || submitToken !== userInfo.value.token) return;
     if (response.errmsg) {
       alert(response.errmsg);
 
@@ -602,6 +652,11 @@ onMounted(() => {
         </div>
       </div>
 
+      <label v-if="replyId && canPrivateReply && !edit && userInfo.token" class="wl-private-reply">
+        <input v-model="privateChoice" type="checkbox" :disabled="privateReply" />
+        {{ locale.privateReply }} — {{ locale.privateReplyHint }}
+      </label>
+      <p v-else-if="isPrivate">{{ locale.privateReplyHint }}</p>
       <textarea
         id="wl-edit"
         ref="textarea"
@@ -647,7 +702,7 @@ onMounted(() => {
           </button>
 
           <button
-            v-if="config.search"
+            v-if="config.search && !isPrivate"
             ref="gif-button"
             type="button"
             class="wl-action"

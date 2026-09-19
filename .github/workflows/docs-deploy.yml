@@ -10,6 +10,7 @@ permissions:
 
 jobs:
   deploy-docs:
+    if: github.repository == 'walinejs/waline'
     runs-on: ubuntu-latest
 
     steps:

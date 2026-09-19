@@ -3,6 +3,7 @@ export type WalineCommentStatus = 'approved' | 'waiting' | 'spam';
 export type WalineUserType = 'administrator' | 'guest';
 
 export interface WalineCommentData {
+  visibility?: 'public' | 'private';
   /** User Nickname */
   nick: string;
 
@@ -53,6 +54,9 @@ export interface WalineCommentData {
 }
 
 export interface BaseWalineResponseComment {
+  visibility?: 'public' | 'private';
+  canPrivateReply?: boolean;
+  canReply?: boolean;
   /** Comment object ID */
   objectId: number;
 

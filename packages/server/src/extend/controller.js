@@ -1,5 +1,6 @@
 const nunjucks = require('nunjucks');
 const { PasswordHash } = require('phpass');
+const PrivateCommentModel = require('../service/private-comment-model.js');
 
 const defaultLocales = require('../locales/index.js');
 
@@ -37,18 +38,23 @@ module.exports = {
 
     return nunjucks.renderString(message, variables);
   },
-  getModel(modelName) {
+  getModel(modelName, { publicOnly = false } = {}) {
     const { storage, customModel } = this.config();
 
     if (typeof customModel === 'function') {
       const modelInstance = customModel(modelName, this);
 
       if (modelInstance) {
-        return modelInstance;
+        return modelName === 'Comment' && storage === 'mysql'
+          ? new PrivateCommentModel(modelInstance, publicOnly ? {} : this.ctx.state.userInfo)
+          : modelInstance;
       }
     }
 
-    return this.service(`storage/${storage}`, modelName);
+    const model = this.service(`storage/${storage}`, modelName);
+    return modelName === 'Comment' && storage === 'mysql'
+      ? new PrivateCommentModel(model, publicOnly ? {} : this.ctx.state.userInfo)
+      : model;
   },
   hashPassword(password) {
     const PwdHash = this.config('encryptPassword') || PasswordHash;

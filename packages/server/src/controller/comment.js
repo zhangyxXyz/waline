@@ -1,4 +1,12 @@
 const BaseRest = require('./rest.js');
+const {
+  active,
+  same,
+  participant,
+  isPrivate,
+  canRead,
+  createAudience,
+} = require('../service/comment-privacy.js');
 const { getMarkdownParser } = require('../service/markdown/index.js');
 
 const markdownParser = getMarkdownParser(think.config('markdown'));
@@ -9,6 +17,18 @@ const formatCmt = async (
   loginUser,
   users = [],
 ) => {
+  if (!canRead(loginUser, comment)) {
+    throw Object.assign(new Error('Comment not found'), { status: 404 });
+  }
+  comment.canPrivateReply =
+    think.config('storage') === 'mysql' &&
+    active(loginUser) &&
+    (isPrivate(comment)
+      ? participant(loginUser, comment)
+      : Boolean(comment.user_id) && !same(comment.user_id, loginUser.objectId));
+  comment.canReply = !isPrivate(comment) || participant(loginUser, comment);
+  delete comment.private_user_a;
+  delete comment.private_user_b;
   ua = think.uaParser(ua);
   if (!think.config('disableUserAgent')) {
     comment.browser = `${ua.browser.name || ''}${(ua.browser.version || '')
@@ -78,6 +98,7 @@ module.exports = class CommentController extends BaseRest {
   }
 
   async getAction() {
+    this.ctx.set('Cache-Control', 'private, no-store');
     const { type } = this.get();
 
     const fnMap = {
@@ -110,11 +131,41 @@ module.exports = class CommentController extends BaseRest {
       user_id: this.ctx.state.userInfo.objectId,
     };
 
+    const input = this.post();
+    let parentTarget, rootTarget;
+    if (
+      (pid != null && !/^[a-zA-Z0-9_-]+$/u.test(String(pid))) ||
+      (rid != null && !/^[a-zA-Z0-9_-]+$/u.test(String(rid))) ||
+      (pid != null && typeof pid === 'object') ||
+      (rid != null && typeof rid === 'object')
+    ) {
+      return this.ctx.throw(400, 'Invalid reply ID');
+    }
+    if (pid) {
+      [parentTarget] = await this.modelInstance.select({ objectId: pid });
+      [rootTarget] = await this.modelInstance.select({ objectId: rid });
+    }
+    const audience = createAudience(this.ctx.state.userInfo, input, parentTarget, rootTarget);
+    if (isPrivate(audience)) {
+      if (this.config('storage') !== 'mysql') {
+        return this.ctx.throw(400, 'Private replies require MySQL');
+      }
+      const ids = [audience.private_user_a, audience.private_user_b];
+      const accounts = await this.getModel('Users').select({
+        objectId: ['IN', ids],
+        type: ['IN', ['guest', 'administrator']],
+      });
+      if (accounts.length !== 2) {
+        return this.ctx.throw(400, 'Both participants need active accounts');
+      }
+    }
+    if (this.config('storage') === 'mysql') Object.assign(data, audience);
+
     if (pid && this.ctx.state.deprecated) {
       data.comment = `[@${at}](#${pid}): ${data.comment}`;
     }
 
-    think.logger.debug('Post Comment initial Data:', data);
+    // Never log comment bodies or private participants.
 
     const { userInfo } = this.ctx.state;
 
@@ -172,7 +223,7 @@ module.exports = class CommentController extends BaseRest {
 
       think.logger.debug(`Comment initial status is ${data.status}`);
 
-      if (data.status === 'approved') {
+      if (data.status === 'approved' && !isPrivate(data)) {
         const spam = await this.service('akismet', this.ctx.serverURL)
           .check(data)
           .catch((err) => {
@@ -204,7 +255,7 @@ module.exports = class CommentController extends BaseRest {
       data.status = 'approved';
     }
 
-    const preSaveResp = await this.hook('preSave', data);
+    const preSaveResp = !isPrivate(data) && (await this.hook('preSave', data));
 
     if (preSaveResp) {
       return this.fail(preSaveResp.errmsg);
@@ -229,10 +280,12 @@ module.exports = class CommentController extends BaseRest {
       }
     }
 
-    await this.ctx.webhook('new_comment', {
-      comment: { ...resp, rawComment: comment },
-      reply: parentComment,
-    });
+    if (!isPrivate(resp)) {
+      await this.ctx.webhook('new_comment', {
+        comment: { ...resp, rawComment: comment },
+        reply: parentComment,
+      });
+    }
 
     const cmtReturn = await formatCmt(
       resp,
@@ -249,7 +302,7 @@ module.exports = class CommentController extends BaseRest {
         )
       : undefined;
 
-    if (data.status !== 'spam') {
+    if (data.status !== 'spam' && !isPrivate(data)) {
       const notify = this.service('notify', this);
 
       await notify.run(
@@ -260,7 +313,7 @@ module.exports = class CommentController extends BaseRest {
 
     think.logger.debug(`Comment notify done!`);
 
-    await this.hook('postSave', resp, parentComment);
+    if (!isPrivate(resp)) await this.hook('postSave', resp, parentComment);
 
     think.logger.debug(`Comment post hooks postSave done!`);
 
@@ -274,7 +327,10 @@ module.exports = class CommentController extends BaseRest {
   async putAction() {
     const { userInfo } = this.ctx.state;
     const isAdmin = userInfo.type === 'administrator';
-    const data = isAdmin ? this.post() : this.post('comment,like');
+    // Ownership, audience and topology are immutable even for administrators.
+    const data = isAdmin
+      ? this.post('comment,like,status,sticky,nick,mail,link')
+      : this.post('comment,like');
     let oldData = await this.modelInstance.select({ objectId: this.id });
 
     if (think.isEmpty(oldData) || think.isEmpty(data)) {
@@ -290,10 +346,12 @@ module.exports = class CommentController extends BaseRest {
       data.like = Math.max(data.like, 0);
     }
 
-    const preUpdateResp = await this.hook('preUpdate', {
-      ...data,
-      objectId: this.id,
-    });
+    const preUpdateResp =
+      !isPrivate(oldData) &&
+      (await this.hook('preUpdate', {
+        ...data,
+        objectId: this.id,
+      }));
 
     if (preUpdateResp) {
       return this.fail(preUpdateResp);
@@ -318,7 +376,12 @@ module.exports = class CommentController extends BaseRest {
       cmtUser ? [cmtUser] : [],
     );
 
-    if (oldData.status === 'waiting' && data.status === 'approved' && oldData.pid) {
+    if (
+      !isPrivate(oldData) &&
+      oldData.status === 'waiting' &&
+      data.status === 'approved' &&
+      oldData.pid
+    ) {
       let pComment = await this.modelInstance.select({
         objectId: oldData.pid,
       });
@@ -349,7 +412,7 @@ module.exports = class CommentController extends BaseRest {
       );
     }
 
-    await this.hook('postUpdate', data);
+    if (!isPrivate(oldData)) await this.hook('postUpdate', data);
 
     return this.success(cmtReturn);
   }
@@ -454,6 +517,7 @@ module.exports = class CommentController extends BaseRest {
 
     if (think.isArray(this.config('levels'))) {
       const countWhere = {
+        ...(this.config('storage') === 'mysql' ? { visibility: 'public' } : {}),
         status: ['NOT IN', ['waiting', 'spam']],
         _complex: {},
       };

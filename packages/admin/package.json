@@ -30,7 +30,7 @@
     "provenance": true
   },
   "scripts": {
-    "build": "NODE_ENV=production vite build",
+    "build": "cross-env NODE_ENV=production vite build",
     "clean": "rimraf ./dist",
     "dev": "vite",
     "prepublishOnly": "pnpm run build"

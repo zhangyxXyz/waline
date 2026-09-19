@@ -1,4 +1,5 @@
 const Base = require('./base.js');
+const { canRead, isPrivate } = require('../service/comment-privacy.js');
 
 module.exports = class CommentLogic extends Base {
   checkAdmin() {
@@ -114,9 +115,26 @@ module.exports = class CommentLogic extends Base {
   async putAction() {
     const { userInfo } = this.ctx.state;
     const data = this.post();
+    const immutable = [
+      'visibility',
+      'private_user_a',
+      'private_user_b',
+      'user_id',
+      'pid',
+      'rid',
+      'url',
+      'objectId',
+      'id',
+    ];
+    if (immutable.some((key) => key in data)) {
+      return this.ctx.throw(400, 'Comment ownership and visibility are immutable');
+    }
+    const [target] = await this.getModel('Comment').select({ objectId: this.id });
+    if (!target || !canRead(userInfo, target)) return this.ctx.throw(404);
 
     // 1. like action
     if (think.isBoolean(data.like) && Object.keys(data).toString() === 'like') {
+      if (isPrivate(target) && think.isEmpty(userInfo)) return this.ctx.throw(401);
       return;
     }
 

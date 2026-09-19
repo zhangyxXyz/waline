@@ -18,7 +18,7 @@ module.exports = function () {
     window.oauthServices = ${JSON.stringify(ctx.state.oauthServices || [])};
     window.serverURL = '${ctx.serverURL}/api/';
     </script>
-    <script src="${
+    <script type="module" src="${
       process.env.WALINE_ADMIN_MODULE_ASSET_URL || '//unpkg.com/@waline/admin'
     }"></script>
   </body>

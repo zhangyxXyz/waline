@@ -14,6 +14,7 @@ permissions:
 
 jobs:
   publish:
+    if: github.repository == 'walinejs/waline'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

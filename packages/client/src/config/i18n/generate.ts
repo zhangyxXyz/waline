@@ -57,6 +57,8 @@ const localeKeys = [
 ];
 
 export const generateLocale = (locale: string[]): WalineLocale =>
-  Object.fromEntries(
-    locale.map((item, index) => [localeKeys[index], item]),
-  ) as unknown as WalineLocale;
+  ({
+    privateReply: 'Private reply',
+    privateReplyHint: 'Visible only to both participants and administrators',
+    ...Object.fromEntries(locale.map((item, index) => [localeKeys[index], item])),
+  }) as unknown as WalineLocale;
