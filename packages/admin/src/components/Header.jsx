@@ -123,7 +123,7 @@ export default function Header() {
         />
       </div>
     ) : null,
-    user?.type ? (
+    user?.type && window.WALINE_STORAGE === 'leancloud' ? (
       <div className="upgrade-tips clear-fix" key="leancloud-warning">
         <Trans
           i18nKey="leancloud warning"

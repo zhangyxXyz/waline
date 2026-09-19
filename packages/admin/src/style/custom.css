@@ -1053,3 +1053,60 @@ button.operate-reply {
 
   cursor: pointer;
 }
+
+/* Region audit feedback stays out of the page layout. */
+.waline-comments-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.waline-region-audit {
+  flex-shrink: 0;
+}
+.waline-audit-toast {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  box-sizing: border-box;
+  max-width: min(560px, calc(100vw - 32px));
+  padding: 16px 18px;
+  border: 1px solid rgb(255 255 255 / 12%);
+  border-radius: 14px;
+  background: #203247;
+  color: #fff;
+  box-shadow: 0 12px 36px rgb(15 30 50 / 22%);
+  font-size: 14px;
+  line-height: 1.7;
+}
+.waline-audit-toast output {
+  overflow-wrap: anywhere;
+}
+.waline-audit-toast button {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font-size: 24px;
+  cursor: pointer;
+}
+.waline-audit-toast button:hover,
+.waline-audit-toast button:focus-visible {
+  background: rgb(255 255 255 / 14%);
+}
+@media (max-width: 600px) {
+  .waline-audit-toast {
+    right: 16px;
+    bottom: calc(16px + env(safe-area-inset-bottom));
+    left: 16px;
+  }
+}

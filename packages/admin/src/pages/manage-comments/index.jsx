@@ -38,9 +38,15 @@ export default function ManageComments() {
   const [regionBusy, setRegionBusy] = useState(false);
   const [regionReport, setRegionReport] = useState('');
 
+  useEffect(() => {
+    if (!regionReport || regionBusy) return;
+    const timer = setTimeout(() => setRegionReport(''), 8000);
+    return () => clearTimeout(timer);
+  }, [regionReport, regionBusy]);
+
   const auditRegions = async () => {
     setRegionBusy(true);
-    setRegionReport('正在识别已有 IP 的属地……');
+    setRegionReport('');
     try {
       let page = 1;
       const totals = { scanned: 0, resolved: 0, missingIP: 0, unmatched: 0 };
@@ -54,7 +60,7 @@ export default function ManageComments() {
       const data = await getCommentList({ page: list.page, filter });
       setList((current) => ({ ...current, ...data }));
       setRegionReport(
-        `已检查 ${totals.scanned} 条：可识别 ${totals.resolved}，缺少 IP ${totals.missingIP}，未匹配 ${totals.unmatched}。属地随请求自动解析；缺少 IP 的评论无法补齐。`,
+        `已检查 ${totals.scanned} 条：可识别 ${totals.resolved} · 缺少 IP ${totals.missingIP} · 未匹配 ${totals.unmatched}`,
       );
     } catch (err) {
       setRegionReport(`识别失败：${err.message}`);
@@ -290,18 +296,29 @@ export default function ManageComments() {
   return (
     <>
       <Header />
-      {user?.type === 'administrator' && (
-        <div className="container">
-          <button type="button" className="btn" disabled={regionBusy} onClick={auditRegions}>
-            {regionBusy ? '正在识别属地…' : '一键识别 IP 属地'}
+      {regionReport && (
+        <div className="waline-audit-toast">
+          <output aria-live="polite">{regionReport}</output>
+          <button type="button" aria-label="关闭提示" onClick={() => setRegionReport('')}>
+            ×
           </button>
-          <output>{regionReport}</output>
         </div>
       )}
       <div className="main">
         <div className="body container">
-          <div className="typecho-page-title">
+          <div className="typecho-page-title waline-comments-title">
             <h2>{t('manage comments')}</h2>
+            {user?.type === 'administrator' && (
+              <button
+                type="button"
+                className="btn waline-region-audit"
+                disabled={regionBusy}
+                onClick={auditRegions}
+                title="根据已保存的 IP 重新识别属地；缺少 IP 的评论无法补齐"
+              >
+                {regionBusy ? '正在识别属地…' : '识别 IP 属地'}
+              </button>
+            )}
           </div>
           <main className="row typecho-page-main">
             <div className="col-mb-12 typecho-list">

@@ -124,6 +124,21 @@ jobs:
           1Panel pinned image: \`ghcr.io/zhangyxxyz/waline@$DIGEST\`
 
           Platforms: linux/amd64, linux/arm64.
+
+          Source commit: \`${{ github.sha }}\`.
+
+          ### Features
+          - Private replies are limited to the two registered participants and site administrators (MySQL required).
+          - Configurable IP region precision and country prefix; raw IP addresses remain administrator-only.
+          - The region audit button is placed in the comment-management header. Results appear in a dismissible toast and disappear after eight seconds.
+          - The LeanCloud migration notice is shown only for LeanCloud storage.
+          - Matching administrator and comment-client assets are bundled under /assets/fork/.
+
+          ### Deployment
+          Back up the database before applying assets/migrations/001-private-replies.mysql.sql on an existing installation. Skip this migration if it has already been applied.
+          Do not roll back to a server that ignores visibility fields after private replies have been created.
+
+          This tag was intentionally reused for the dashboard update. Deployments pinned to the previous image digest remain unchanged until explicitly updated.
           EOF
           if gh release view "$VERSION" >/dev/null 2>&1; then
             gh release edit "$VERSION" --title "$VERSION" --notes-file "$RUNNER_TEMP/release-notes.md"
