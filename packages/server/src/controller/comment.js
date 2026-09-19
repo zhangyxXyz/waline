@@ -69,7 +69,10 @@ const formatCmt = async (
 
   // administrator can always show region
   if (isAdmin || !think.config('disableRegion')) {
-    comment.addr = await think.ip2region(ip, { depth: isAdmin ? 3 : 1 });
+    comment.addr = await think.ip2region(ip, {
+      level: isAdmin ? 'isp' : think.config('regionLevel') || 'province',
+      country: isAdmin || Boolean(think.config('regionShowCountry')),
+    });
   }
 
   comment.comment = (await markdownParser)(comment.comment);
@@ -105,12 +108,43 @@ module.exports = class CommentController extends BaseRest {
       recent: this['getRecentCommentList'],
       count: this['getCommentCount'],
       list: this['getAdminCommentList'],
+      'region-audit': this['getRegionAudit'],
     };
 
     const fn = fnMap[type] || this['getCommentList'];
     const data = await fn.call(this);
 
     return this.jsonOrSuccess(data);
+  }
+
+  async getRegionAudit() {
+    if (this.ctx.state.userInfo?.type !== 'administrator') return this.ctx.throw(403);
+    const page = Number(this.get('page')) || 1;
+    const pageSize = 100;
+    const total = await this.modelInstance.count({});
+    const rows = await this.modelInstance.select(
+      {},
+      {
+        field: ['ip'],
+        order: [{ field: 'objectId', direction: 'asc' }],
+        limit: pageSize,
+        offset: (page - 1) * pageSize,
+      },
+    );
+    const result = {
+      total,
+      scanned: rows.length,
+      resolved: 0,
+      missingIP: 0,
+      unmatched: 0,
+      nextPage: page * pageSize < total ? page + 1 : null,
+    };
+    for (const row of rows) {
+      if (!row.ip) result.missingIP += 1;
+      else if (await think.ip2region(row.ip, { level: 'isp', country: true })) result.resolved += 1;
+      else result.unmatched += 1;
+    }
+    return result;
   }
 
   async postAction() {

@@ -19,6 +19,8 @@ const {
   SECURE_DOMAINS,
   DISABLE_USERAGENT,
   DISABLE_REGION,
+  REGION_LEVEL = 'province',
+  REGION_SHOW_COUNTRY,
   AVATAR_PROXY,
   GITHUB_TOKEN,
   OAUTH_URL,
@@ -119,6 +121,10 @@ module.exports = {
   secureDomains: SECURE_DOMAINS ? SECURE_DOMAINS.split(/\s*,\s*/u) : null,
   disableUserAgent: DISABLE_USERAGENT && !isFalse(DISABLE_USERAGENT),
   disableRegion: DISABLE_REGION && !isFalse(DISABLE_REGION),
+  regionLevel: ['off', 'country', 'province', 'city', 'isp'].includes(REGION_LEVEL)
+    ? REGION_LEVEL
+    : 'province',
+  regionShowCountry: ['1', 'true'].includes((REGION_SHOW_COUNTRY || '').toLowerCase()),
   levels: !LEVELS || isFalse(LEVELS) ? false : LEVELS.split(/\s*,\s*/u).map(Number),
 
   audit: COMMENT_AUDIT && !isFalse(COMMENT_AUDIT),

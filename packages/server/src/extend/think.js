@@ -1,5 +1,6 @@
 const IP2Region = require('ip2region').default;
 const parser = require('ua-parser-js');
+const { formatRegion } = require('../service/region-format.js');
 
 const preventMessage = 'PREVENT_NEXT_PROCESS';
 
@@ -83,7 +84,7 @@ module.exports = {
       }
     });
   },
-  async ip2region(ip, { depth = 1 }) {
+  async ip2region(ip, { depth = 1, level, country = false } = {}) {
     if (!ip) return '';
 
     try {
@@ -92,6 +93,8 @@ module.exports = {
       if (!res) {
         return '';
       }
+
+      if (level) return formatRegion(res, { level, country });
 
       const { province, city, isp } = res;
       const address = [...new Set([province, city, isp].filter(Boolean))];

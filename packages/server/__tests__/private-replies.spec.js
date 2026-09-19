@@ -289,6 +289,27 @@ describe('private reply access', () => {
     await expect(response.text()).resolves.not.toContain('PRIVATE_SENTINEL');
   });
 
+  it('restricts region auditing and raw IP to administrators', async () => {
+    for (const id of [undefined, 1, 5]) {
+      expect(
+        (await request('/api/comment?type=region-audit&path=/post', id)).status,
+      ).toBeGreaterThanOrEqual(400);
+    }
+    db.prepare('UPDATE Comment SET ip = NULL WHERE id = 3').run();
+    const audit = await json('/api/comment?type=region-audit', 4);
+    expect(audit.errno).toBe(0);
+    expect(audit.data.scanned).toBe(3);
+    expect(audit.data.missingIP).toBe(1);
+    expect(audit.data.nextPage).toBeNull();
+    expect(JSON.stringify(audit)).not.toContain('127.0.0.1');
+    for (const id of [undefined, 1]) {
+      const comments = await json('/api/comment?path=/post', id);
+      expect(comments.data.data[0]).not.toHaveProperty('ip');
+    }
+    const admin = await json('/api/comment?path=/post', 4);
+    expect(admin.data.data[0].ip).toBe('127.0.0.1');
+  });
+
   it('creates a fixed audience and skips outgoing hooks', async () => {
     const result = await post(1);
     expect(result.errno).toBe(0);

@@ -23,6 +23,13 @@ module.exports = class CommentLogic extends Base {
     }
 
     switch (type) {
+      case 'region-audit': {
+        this.checkAdmin();
+        this.rules = {
+          page: { int: { min: 1 }, default: 1 },
+        };
+        break;
+      }
       case 'recent': {
         this.rules = {
           count: {

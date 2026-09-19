@@ -1,5 +1,8 @@
 import request from '../utils/request.js';
 
+export const auditCommentRegions = (page = 1) =>
+  request({ url: `comment?type=region-audit&page=${page}`, method: 'GET' });
+
 export const getCommentList = ({ page = 1, filter }) =>
   request({
     url: `comment?type=list&owner=${filter.owner}&status=${filter.status}&keyword=${filter.keyword}&page=${page}`,

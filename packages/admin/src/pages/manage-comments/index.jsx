@@ -6,6 +6,7 @@ import { useSelector } from 'react-redux';
 import Header from '../../components/Header.jsx';
 import Paginator from '../../components/Paginator.jsx';
 import {
+  auditCommentRegions,
   deleteComment,
   getCommentList,
   replyComment,
@@ -34,6 +35,33 @@ export default function ManageComments() {
   const [cmtHandler, setCmtHandler] = useState({});
   const [actDropStatus, setActDropStatus] = useState(false);
   const [commentIds, setCommentIds] = useState([]);
+  const [regionBusy, setRegionBusy] = useState(false);
+  const [regionReport, setRegionReport] = useState('');
+
+  const auditRegions = async () => {
+    setRegionBusy(true);
+    setRegionReport('正在识别已有 IP 的属地……');
+    try {
+      let page = 1;
+      const totals = { scanned: 0, resolved: 0, missingIP: 0, unmatched: 0 };
+      while (page) {
+        // Each batch returns the cursor for the next request.
+        // oxlint-disable-next-line no-await-in-loop
+        const result = await auditCommentRegions(page);
+        for (const key of Object.keys(totals)) totals[key] += result[key];
+        page = result.nextPage;
+      }
+      const data = await getCommentList({ page: list.page, filter });
+      setList((current) => ({ ...current, ...data }));
+      setRegionReport(
+        `已检查 ${totals.scanned} 条：可识别 ${totals.resolved}，缺少 IP ${totals.missingIP}，未匹配 ${totals.unmatched}。属地随请求自动解析；缺少 IP 的评论无法补齐。`,
+      );
+    } catch (err) {
+      setRegionReport(`识别失败：${err.message}`);
+    } finally {
+      setRegionBusy(false);
+    }
+  };
 
   const FILTERS = [
     [
@@ -262,6 +290,14 @@ export default function ManageComments() {
   return (
     <>
       <Header />
+      {user?.type === 'administrator' && (
+        <div className="container">
+          <button type="button" className="btn" disabled={regionBusy} onClick={auditRegions}>
+            {regionBusy ? '正在识别属地…' : '一键识别 IP 属地'}
+          </button>
+          <output>{regionReport}</output>
+        </div>
+      )}
       <div className="main">
         <div className="body container">
           <div className="typecho-page-title">
