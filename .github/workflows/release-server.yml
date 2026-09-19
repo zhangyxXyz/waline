@@ -41,8 +41,6 @@ jobs:
             echo 'Release tags must point to commits on dev'; exit 1;
           }
       - uses: docker/setup-qemu-action@v4
-        with:
-          cache-image: false
       - uses: docker/setup-buildx-action@v4
       - name: Build and test tagged source
         uses: docker/build-push-action@v7
@@ -52,6 +50,8 @@ jobs:
           platforms: linux/amd64
           load: true
           tags: waline-smoke:${{ github.sha }}
+          cache-from: type=gha,scope=waline-fork
+          cache-to: type=gha,mode=max,scope=waline-fork
       - name: Smoke test packaged assets
         env:
           IMAGE: waline-smoke:${{ github.sha }}
@@ -89,6 +89,8 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=waline-fork
+          cache-to: type=gha,mode=max,scope=waline-fork
       - name: Record deployment reference
         env:
           DIGEST: ${{ steps.publish.outputs.digest }}

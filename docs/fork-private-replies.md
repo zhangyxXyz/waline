@@ -90,6 +90,6 @@ pnpm run build
 
 发布工作流名称为 `Publish @seiun/waline`。只接受 `vX.Y.Z-seiun` 标签；手动重试也必须选择对应标签，普通分支不能发布。后续版本递增版本号，不追加发布尝试次数。
 
-镜像直接构建并上传 GHCR。成功后创建正式 GitHub Release，记录镜像标签和 digest。本流程没有跨任务文件传递，不创建临时 Release 草稿，也不上传 Actions 构建记录或 GHA 构建缓存。临时构建数据在 runner 内清理，runner 结束后销毁；最终 GHCR 镜像和正式 Release 保留。
+镜像直接构建并上传 GHCR。成功后创建正式 GitHub Release，记录镜像标签和 digest。本流程没有跨任务文件传递，不创建临时 Release 草稿，也不上传 Actions 构建记录。保留 GHA 构建缓存用于加速，仓库缓存上限维持 10 GB；缓存与 Artifacts 使用独立额度，不在每次发布后清空。临时构建数据在 runner 内清理，runner 结束后销毁；最终 GHCR 镜像和正式 Release 保留。
 
 `Delete old workflow runs` 每周日北京时间 08:00 清理：每个工作流保留最近 6 次运行，且保留所有不足 30 天和仍在运行的任务。手动运行默认仅预览；修改清理脚本触发的运行也仅预览。删除历史运行不会删除正式 Release 或 GHCR 镜像。
