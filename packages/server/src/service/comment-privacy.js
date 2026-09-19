@@ -12,7 +12,7 @@ const canRead = (user, comment) =>
 const error = (message, status = 400) => Object.assign(new Error(message), { status });
 
 // The parent and root must have been loaded through the viewer-scoped model.
-const createAudience = (user, input, parent, root) => {
+const createAudience = (user, input, { parent, root, owner }) => {
   if (input.visibility !== undefined && !['public', 'private'].includes(input.visibility)) {
     throw error('Invalid comment visibility');
   }
@@ -31,8 +31,19 @@ const createAudience = (user, input, parent, root) => {
     ) {
       throw error('Invalid reply target');
     }
-  } else if (input.rid || input.visibility === 'private') {
-    throw error('Private comments must reply to an account-owned comment');
+  } else if (input.rid) {
+    throw error('Invalid reply target');
+  }
+  if (!input.pid && input.visibility === 'private') {
+    if (!active(user)) throw error('Login required', 401);
+    if (!active(owner) || owner.type !== 'administrator' || same(owner.objectId, user.objectId)) {
+      throw error('A private message requires a distinct site administrator');
+    }
+    return {
+      visibility: 'private',
+      private_user_a: String(user.objectId),
+      private_user_b: String(owner.objectId),
+    };
   }
   if (
     parent &&

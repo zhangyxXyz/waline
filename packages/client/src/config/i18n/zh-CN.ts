@@ -56,6 +56,6 @@ export default {
     '订阅本站评论',
     '订阅你的评论回复',
   ]),
-  privateReply: '私密回复',
+  privateReply: '私密留言',
   privateReplyHint: '仅双方账户及管理员可见',
 };

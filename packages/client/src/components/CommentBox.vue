@@ -652,7 +652,15 @@ onMounted(() => {
         </div>
       </div>
 
-      <label v-if="replyId && canPrivateReply && !edit && userInfo.token" class="wl-private-reply">
+      <label
+        v-if="
+          (!replyId || canPrivateReply) &&
+          !edit &&
+          userInfo.token &&
+          (replyId || userInfo.type !== 'administrator')
+        "
+        class="wl-private-reply"
+      >
         <input v-model="privateChoice" type="checkbox" :disabled="privateReply" />
         {{ locale.privateReply }} — {{ locale.privateReplyHint }}
       </label>

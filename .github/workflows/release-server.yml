@@ -128,7 +128,8 @@ jobs:
           Source commit: \`${{ github.sha }}\`.
 
           ### Features
-          - Private replies are limited to the two registered participants and site administrators (MySQL required).
+          - Signed-in visitors can send top-level private messages to the site owner. Subsequent replies retain the same two participants; site administrators can moderate them (MySQL required).
+          - With multiple administrators, set PRIVATE_MESSAGE_ADMIN_ID to select the site owner. Anonymous private messages and client-supplied recipients are rejected.
           - Configurable IP region precision and country prefix; raw IP addresses remain administrator-only.
           - The region audit button is placed in the comment-management header. Results appear in a dismissible toast and disappear after eight seconds.
           - The LeanCloud migration notice is shown only for LeanCloud storage.

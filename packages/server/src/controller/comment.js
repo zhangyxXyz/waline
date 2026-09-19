@@ -179,7 +179,20 @@ module.exports = class CommentController extends BaseRest {
       [parentTarget] = await this.modelInstance.select({ objectId: pid });
       [rootTarget] = await this.modelInstance.select({ objectId: rid });
     }
-    const audience = createAudience(this.ctx.state.userInfo, input, parentTarget, rootTarget);
+    let owner;
+    if (!pid && input.visibility === 'private') {
+      const owners = await this.getModel('Users').select({ type: 'administrator' });
+      owner = process.env.PRIVATE_MESSAGE_ADMIN_ID
+        ? owners.find((account) => same(account.objectId, process.env.PRIVATE_MESSAGE_ADMIN_ID))
+        : owners.length === 1
+          ? owners[0]
+          : undefined;
+    }
+    const audience = createAudience(this.ctx.state.userInfo, input, {
+      parent: parentTarget,
+      root: rootTarget,
+      owner,
+    });
     if (isPrivate(audience)) {
       if (this.config('storage') !== 'mysql') {
         return this.ctx.throw(400, 'Private replies require MySQL');

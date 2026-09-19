@@ -337,11 +337,31 @@ describe('private reply access', () => {
     [1, { pid: 1, url: '/wrong' }],
     [1, { user_id: 2 }],
     [1, { private_user_a: 3 }],
-    [1, { pid: undefined, rid: undefined }],
+    [4, { pid: undefined, rid: undefined }],
+    [undefined, { pid: undefined, rid: undefined }],
+    [5, { pid: undefined, rid: undefined }],
   ])('rejects invalid private creation %#', async (id, extra) => {
     const result = await post(id, extra);
     expect([400, 401, 403, 404]).toContain(result.errno);
     expect(db.prepare('SELECT COUNT(*) AS n FROM Comment').get().n).toBe(3);
+  });
+
+  it('creates a private root addressed to the administrator and preserves its audience', async () => {
+    const result = await post(1, { pid: undefined, rid: undefined });
+    expect(result.errno).toBe(0);
+    const rootId = result.data.objectId;
+    const row = db.prepare('SELECT * FROM Comment WHERE id=?').get(rootId);
+    expect(Number(row.private_user_a)).toBe(1);
+    expect(Number(row.private_user_b)).toBe(4);
+    for (const id of [undefined, 2, 3]) {
+      expect(JSON.stringify(await json('/api/comment?path=/post', id))).not.toContain('new secret');
+    }
+    const reply = await post(4, { pid: rootId, rid: rootId, visibility: undefined });
+    expect(reply.errno).toBe(0);
+    expect(reply.data.visibility).toBe('private');
+    expect((await post(3, { pid: rootId, rid: rootId })).errno).not.toBe(0);
+    expect((await post(1, { pid: rootId, rid: rootId, visibility: 'public' })).errno).not.toBe(0);
+    expect(sideEffect).not.toHaveBeenCalled();
   });
 
   it.each([undefined, 3, 5])('blocks direct edits and likes for %s', async (id) => {
