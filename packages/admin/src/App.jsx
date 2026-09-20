@@ -23,7 +23,7 @@ export default function App() {
           <Route
             path="/ui/mail"
             element={
-              <Access meta={{ auth: 'administrator' }} basename={basePath}>
+              <Access meta={{ auth: 'administrator' }}>
                 <Mail />
               </Access>
             }
@@ -32,7 +32,7 @@ export default function App() {
             path="/ui"
             exact
             element={
-              <Access meta={{ auth: 'administrator' }} basename={basePath}>
+              <Access meta={{ auth: 'administrator' }}>
                 <ManageComments />
               </Access>
             }
@@ -41,7 +41,7 @@ export default function App() {
             path="/ui/user"
             exact
             element={
-              <Access meta={{ auth: 'administrator' }} basename={basePath}>
+              <Access meta={{ auth: 'administrator' }}>
                 <User />
               </Access>
             }
@@ -50,7 +50,7 @@ export default function App() {
             path="/ui/migration"
             exact
             element={
-              <Access meta={{ auth: 'administrator' }} basename={basePath}>
+              <Access meta={{ auth: 'administrator' }}>
                 <Migration />
               </Access>
             }

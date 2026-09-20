@@ -47,6 +47,11 @@ export default function Header() {
   };
 
   const siteName = window.SITE_NAME || 'Waline';
+  const homePath = user?.objectId
+    ? user.type === 'administrator'
+      ? '/ui'
+      : '/ui/profile'
+    : '/ui/login';
 
   const navItems = [
     { to: '/ui', label: t('comment') },
@@ -59,7 +64,7 @@ export default function Header() {
     <header className="typecho-head-nav clear-fix" key="header">
       <div className="waline-header">
         <div className="waline-brand">
-          <Link to="/ui" className="waline-brand-link">
+          <Link to={homePath} className="waline-brand-link">
             <span className="waline-brand-mark" />
             <span className="waline-brand-copy">
               <strong>{siteName}</strong>

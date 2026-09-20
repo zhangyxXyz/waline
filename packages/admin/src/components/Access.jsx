@@ -1,27 +1,16 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { useSelector } from 'react-redux';
+import { Navigate, useLocation } from 'react-router';
 
 export default function Access(props) {
   const user = useSelector((state) => state.user);
+  const { pathname } = useLocation();
 
-  useEffect(() => {
-    const meta = props.meta ?? {};
-    const basename = props.basename ?? '';
-    const emptyUser = !user?.objectId;
-    const currentPath = location.pathname.replace(basename, '') || '/';
-    const redirectPath = currentPath.startsWith('/') ? currentPath : `/${currentPath}`;
-
-    if (emptyUser) {
-      location.href = `${basename}/ui/login?redirect=${redirectPath}`;
-      return;
-    }
-
-    const noPermission = meta.auth ? meta.auth !== user.type : false;
-
-    if (noPermission) {
-      location.href = `${basename}/ui/profile`;
-    }
-  }, [user, props.meta, props.basename]);
-
-  return user ? props.children : null;
+  if (!user?.objectId) {
+    return <Navigate to={`/ui/login?redirect=${encodeURIComponent(pathname)}`} replace />;
+  }
+  if (props.meta?.auth && props.meta.auth !== user.type) {
+    return <Navigate to="/ui/profile" replace />;
+  }
+  return props.children;
 }
