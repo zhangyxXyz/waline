@@ -6,6 +6,8 @@ import { useSelector } from 'react-redux';
 import Header from '../../components/Header.jsx';
 import Paginator from '../../components/Paginator.jsx';
 import RegionSettings from '../../components/RegionSettings.jsx';
+import RegionDatabase from '../../components/RegionDatabase.jsx';
+import LevelSettings from '../../components/LevelSettings.jsx';
 import {
   auditCommentRegions,
   deleteComment,
@@ -37,12 +39,12 @@ export default function ManageComments() {
   const [actDropStatus, setActDropStatus] = useState(false);
   const [commentIds, setCommentIds] = useState([]);
   const [regionBusy, setRegionBusy] = useState(false);
-  const [regionReport, setRegionReport] = useState('');
+  const [regionReport, setRegionReport] = useState(null);
   const [activePanel, setActivePanel] = useState('comments');
 
   useEffect(() => {
     if (!regionReport || regionBusy) return;
-    const timer = setTimeout(() => setRegionReport(''), 8000);
+    const timer = setTimeout(() => setRegionReport(null), 8000);
     return () => clearTimeout(timer);
   }, [regionReport, regionBusy]);
 
@@ -61,11 +63,9 @@ export default function ManageComments() {
       }
       const data = await getCommentList({ page: list.page, filter });
       setList((current) => ({ ...current, ...data }));
-      setRegionReport(
-        `已检查 ${totals.scanned} 条：可识别 ${totals.resolved} · 缺少 IP ${totals.missingIP} · 未匹配 ${totals.unmatched}`,
-      );
-    } catch (err) {
-      setRegionReport(`识别失败：${err.message}`);
+      setRegionReport({ key: 'region.auditResult', values: totals });
+    } catch {
+      setRegionReport({ key: 'region.auditFailed' });
     } finally {
       setRegionBusy(false);
     }
@@ -300,8 +300,8 @@ export default function ManageComments() {
       <Header />
       {regionReport && (
         <div className="waline-audit-toast">
-          <output aria-live="polite">{regionReport}</output>
-          <button type="button" aria-label="关闭提示" onClick={() => setRegionReport('')}>
+          <output aria-live="polite">{t(regionReport.key, regionReport.values)}</output>
+          <button type="button" aria-label={t('management.close')} onClick={() => setRegionReport(null)}>
             ×
           </button>
         </div>
@@ -309,41 +309,48 @@ export default function ManageComments() {
       <div className="main">
         <div className="body container">
           {user?.type === 'administrator' && (
-            <nav className="waline-management-tabs" aria-label="管理页签">
+            <nav className="waline-management-tabs" aria-label={t('management.tabs')}>
               <button
                 type="button"
                 aria-pressed={activePanel === 'comments'}
                 onClick={() => setActivePanel('comments')}
               >
-                评论管理
+                {t('manage comments')}
               </button>
               <button
                 type="button"
                 aria-pressed={activePanel === 'ip'}
                 onClick={() => setActivePanel('ip')}
               >
-                IP 地址管理
+                {t('region.title')}
+              </button>
+              <button type="button" aria-pressed={activePanel === 'levels'} onClick={() => setActivePanel('levels')}>
+                {t('levels.title')}
               </button>
             </nav>
           )}
           <div className="typecho-page-title waline-comments-title">
-            <h2>{activePanel === 'ip' ? 'IP 地址管理' : t('manage comments')}</h2>
+            <h2>{t(activePanel === 'ip' ? 'region.title' : activePanel === 'levels' ? 'levels.title' : 'manage comments')}</h2>
           </div>
           <main className="row typecho-page-main">
+            {user?.type === 'administrator' && activePanel === 'levels' && (
+              <div className="waline-ip-panel"><LevelSettings /></div>
+            )}
             {user?.type === 'administrator' && activePanel === 'ip' && (
               <div className="waline-ip-panel">
                 <RegionSettings />
+                <RegionDatabase />
                 <section className="waline-region-audit-card">
-                  <h3>识别已有评论的属地</h3>
-                  <p>根据已保存的 IP 重新查询。缺少 IP 的历史评论无法补齐。</p>
+                  <h3>{t('region.auditTitle')}</h3>
+                  <p>{t('region.auditTip')}</p>
                   <button
                     type="button"
                     className="btn waline-region-audit"
                     disabled={regionBusy}
                     onClick={auditRegions}
-                    title="根据已保存的 IP 重新识别属地；缺少 IP 的评论无法补齐"
+                    title={t('region.auditTip')}
                   >
-                    {regionBusy ? '正在识别属地…' : '一键识别 IP 属地'}
+                    {t(regionBusy ? 'region.auditing' : 'region.audit')}
                   </button>
                 </section>
               </div>

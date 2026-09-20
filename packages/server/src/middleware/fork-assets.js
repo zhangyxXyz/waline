@@ -7,6 +7,7 @@ module.exports = () => async (ctx, next) => {
     '/assets/fork/admin.js': ['admin.js', 'application/javascript'],
     '/assets/fork/waline.js': ['waline.js', 'application/javascript'],
     '/assets/fork/waline.css': ['waline.css', 'text/css'],
+    '/assets/fork/waline-meta.css': ['waline-meta.css', 'text/css'],
   };
   const file = files[ctx.path];
   if (!file || !['GET', 'HEAD'].includes(ctx.method)) return next();

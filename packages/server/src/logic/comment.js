@@ -23,6 +23,8 @@ module.exports = class CommentLogic extends Base {
     }
 
     switch (type) {
+      case 'level-settings':
+      case 'region-database':
       case 'region-settings': {
         this.checkAdmin();
         break;
@@ -98,6 +100,10 @@ module.exports = class CommentLogic extends Base {
   }
 
   async postAction() {
+    if (this.get('type') === 'region-database-update') {
+      this.checkAdmin();
+      return;
+    }
     const { LOGIN } = process.env;
     const { userInfo } = this.ctx.state;
 
@@ -124,7 +130,7 @@ module.exports = class CommentLogic extends Base {
   }
 
   async putAction() {
-    if (this.get('type') === 'region-settings') {
+    if (['level-settings', 'region-settings', 'region-database'].includes(this.get('type'))) {
       this.checkAdmin();
       return;
     }

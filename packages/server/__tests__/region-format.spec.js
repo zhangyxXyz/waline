@@ -7,6 +7,24 @@ const { formatRegion: format } = require('../src/service/region-format.js');
 const china = { country: '中国', province: '浙江省', city: '杭州市', isp: '电信' };
 
 describe('region disclosure limits', () => {
+  it('localizes English country names without changing regional or ISP names', () => {
+    const usa = {
+      country: 'United States',
+      province: 'California',
+      city: 'Los Angeles',
+      isp: 'MULTACOM CORPORATION',
+    };
+    expect(format(usa, { level: 'country' })).toBe('美国');
+    expect(format(usa, { level: 'isp', country: true })).toBe(
+      '美国 California Los Angeles MULTACOM CORPORATION',
+    );
+    expect(format(usa, { level: 'province' })).toBe('California');
+    expect(format(usa, { level: 'off', country: true })).toBe('');
+    expect(format({ country: 'Japan' }, { level: 'country' })).toBe('日本');
+    expect(format({ country: '中国' }, { level: 'country' })).toBe('中国');
+    expect(format({ country: 'Unrecognized place' }, { level: 'country' })).toBe('Unrecognized place');
+  });
+
   it('limits precision and optionally prefixes the country', () => {
     expect(format(china)).toBe('浙江省');
     expect(format(china, { level: 'country' })).toBe('中国');

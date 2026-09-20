@@ -34,6 +34,7 @@ export interface WalineConfig extends Required<
   >
 > {
   locale: WalineLocale;
+  localeOverrides: Partial<WalineLocale>;
   wordLimit: [number, number] | false;
   emoji: (WalineEmojiInfo | WalineEmojiPresets)[] | null;
   highlighter: WalineHighlighter | null;
@@ -103,6 +104,7 @@ export const getConfig = ({
   recaptchaV3Key,
   turnstileKey,
   ...more,
+  localeOverrides: typeof locale === 'object' && locale ? { ...locale } : {},
   // oxlint-disable-next-line typescript/strict-boolean-expressions, typescript/prefer-nullish-coalescing
   reaction: reaction === true ? DEFAULT_REACTION : reaction || null,
   imageUploader: withFallback(imageUploader, defaultUploadImage),

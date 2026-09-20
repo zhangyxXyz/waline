@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import request from '../utils/request.js';
 
 export default function RegionSettings() {
+  const { t } = useTranslation();
   const [settings, setSettings] = useState(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
@@ -13,7 +15,7 @@ export default function RegionSettings() {
         if (active) setSettings({ level: data.level, country: data.country });
       })
       .catch(() => {
-        if (active) setMessage('无法读取属地设置，请刷新重试');
+        if (active) setMessage('region.loadFailed');
       });
     return () => {
       active = false;
@@ -23,31 +25,34 @@ export default function RegionSettings() {
     setBusy(true);
     setMessage('');
     try {
-      await request('comment?type=region-settings', { method: 'PUT', body: settings });
-      setMessage('已保存，新的评论请求立即生效');
+      await request('comment?type=region-settings', {
+        method: 'PUT',
+        body: settings,
+      });
+      setMessage('levels.saved');
     } catch {
-      setMessage('保存失败，请检查服务器持久化目录权限后重试');
+      setMessage('region.saveFailed');
     } finally {
       setBusy(false);
     }
   };
   return (
     <section className="waline-region-settings">
-      <h3>属地显示设置</h3>
+      <h3>{t('region.settings')}</h3>
       {settings && (
         <div className="waline-region-settings-fields">
           <label>
-            访客可见精度{' '}
+            {t('region.precision')}{' '}
             <select
               value={settings.level}
               disabled={busy}
               onChange={(event) => setSettings({ ...settings, level: event.target.value })}
             >
-              <option value="off">不显示</option>
-              <option value="country">国家</option>
-              <option value="province">省／地区</option>
-              <option value="city">城市</option>
-              <option value="isp">城市与运营商</option>
+              {['off', 'country', 'province', 'city', 'isp'].map((level) => (
+                <option key={level} value={level}>
+                  {t(`region.${level}`)}
+                </option>
+              ))}
             </select>
           </label>
           <label>
@@ -57,15 +62,15 @@ export default function RegionSettings() {
               disabled={busy || settings.level === 'off' || settings.level === 'country'}
               onChange={(event) => setSettings({ ...settings, country: event.target.checked })}
             />{' '}
-            附带国家
+            {t('region.includeCountry')}
           </label>
           <button type="button" className="btn" disabled={busy} onClick={save}>
-            {busy ? '保存中…' : '保存'}
+            {t(busy ? 'management.saving' : 'management.save')}
           </button>
-          <small>只影响普通访客；管理员仍可查看完整 IP 和详细属地。</small>
+          <small>{t('region.visibilityTip')}</small>
         </div>
       )}
-      <output aria-live="polite">{message}</output>
+      <output aria-live="polite">{message && t(message)}</output>
     </section>
   );
 }

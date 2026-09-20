@@ -6,6 +6,7 @@ import { computed, inject } from 'vue';
 import { useLikeStorage, useUserInfo } from '../composables/index.js';
 import { configKey } from '../config/index.js';
 import { getTimeAgo, isLinkHttp } from '../utils/index.js';
+import { getLevelLabel } from '../utils/level.js';
 import CommentBox from './CommentBox.vue';
 import {
   AdministratorIcon,
@@ -49,6 +50,7 @@ const now = useNow();
 const userInfo = useUserInfo();
 
 const locale = computed(() => config.value.locale);
+const levelLabel = computed(() => getLevelLabel(comment, locale.value, config.value.localeOverrides));
 
 const link = computed(() => {
   const { link } = comment;
@@ -102,7 +104,7 @@ const isEditingCurrent = computed(() => comment.objectId === edit?.objectId);
         <span
           v-if="typeof comment.level === 'number'"
           :class="`wl-badge level${comment.level}`"
-          v-text="locale[`level${comment.level}`] || `Level ${comment.level}`"
+          v-text="levelLabel"
         />
 
         <span class="wl-time" v-text="time" />

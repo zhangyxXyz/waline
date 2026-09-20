@@ -1,5 +1,7 @@
 const BaseRest = require('./rest.js');
+const levelSettings = require('../service/level-settings.js');
 const regionSettings = require('../service/region-settings.js');
+const regionDatabase = require('../service/region-database.js');
 
 const currentRegionSettings = () =>
   regionSettings.read({
@@ -109,6 +111,16 @@ module.exports = class CommentController extends BaseRest {
   }
 
   async getAction() {
+    if (this.get('type') === 'level-settings') {
+      if (this.ctx.state.userInfo?.type !== 'administrator') return this.ctx.throw(403);
+      this.ctx.set('Cache-Control', 'private, no-store');
+      return this.success(levelSettings.read(this.config('levels')));
+    }
+    if (this.get('type') === 'region-database') {
+      if (this.ctx.state.userInfo?.type !== 'administrator') return this.ctx.throw(403);
+      this.ctx.set('Cache-Control', 'private, no-store');
+      return this.success(regionDatabase.status());
+    }
     if (this.get('type') === 'region-settings') {
       if (this.ctx.state.userInfo?.type !== 'administrator') return this.ctx.throw(403);
       this.ctx.set('Cache-Control', 'private, no-store');
@@ -161,6 +173,10 @@ module.exports = class CommentController extends BaseRest {
   }
 
   async postAction() {
+    if (this.get('type') === 'region-database-update') {
+      if (this.ctx.state.userInfo?.type !== 'administrator') return this.ctx.throw(403);
+      return this.success(regionDatabase.startUpdate());
+    }
     think.logger.debug('Post Comment Start!');
 
     const { comment, link, mail, nick, pid, rid, ua, url, at } = this.post();
@@ -385,6 +401,14 @@ module.exports = class CommentController extends BaseRest {
   }
 
   async putAction() {
+    if (this.get('type') === 'level-settings') {
+      if (this.ctx.state.userInfo?.type !== 'administrator') return this.ctx.throw(403);
+      return this.success(levelSettings.write(this.post()));
+    }
+    if (this.get('type') === 'region-database') {
+      if (this.ctx.state.userInfo?.type !== 'administrator') return this.ctx.throw(403);
+      return this.success(regionDatabase.save(this.post()));
+    }
     if (this.get('type') === 'region-settings') {
       if (this.ctx.state.userInfo?.type !== 'administrator') return this.ctx.throw(403);
       return this.success(regionSettings.write(this.post()));
@@ -579,7 +603,8 @@ module.exports = class CommentController extends BaseRest {
       );
     }
 
-    if (think.isArray(this.config('levels'))) {
+    const currentLevels = levelSettings.read(this.config('levels'));
+    if (currentLevels.enabled) {
       const countWhere = {
         ...(this.config('storage') === 'mysql' ? { visibility: 'public' } : {}),
         status: ['NOT IN', ['waiting', 'spam']],
@@ -606,13 +631,7 @@ module.exports = class CommentController extends BaseRest {
         group: ['user_id', 'mail'],
       });
 
-      comments.forEach((cmt) => {
-        const countItem = (counts || []).find(({ mail, user_id }) =>
-          cmt.user_id ? user_id === cmt.user_id : mail === cmt.mail,
-        );
-
-        cmt.level = think.getLevel(countItem?.count);
-      });
+      levelSettings.apply(comments, counts || [], currentLevels);
     }
 
     return {

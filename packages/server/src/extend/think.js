@@ -1,7 +1,7 @@
 const IP2Region = require('ip2region').default;
 const parser = require('ua-parser-js');
-const path = require('node:path');
 const { formatRegion } = require('../service/region-format.js');
+const regionDatabase = require('../service/region-database.js');
 
 const preventMessage = 'PREVENT_NEXT_PROCESS';
 
@@ -9,17 +9,18 @@ const preventMessage = 'PREVENT_NEXT_PROCESS';
 // Instance is created on first access and reused for all subsequent calls
 const getIP2RegionInstance = (() => {
   let instance = null;
+  let loadedFile;
 
   // oxlint-disable-next-line react/function-component-definition
   return () => {
-    if (!instance) {
-      instance = new IP2Region({
-        ipv4db:
-          process.env.IP2REGION_DB_V4 ||
-          process.env.IP2REGION_DB ||
-          path.resolve(__dirname, '../../data/ip2region-v4.db'),
+    const ipv4db = regionDatabase.activeFile();
+    if (!instance || loadedFile !== ipv4db) {
+      const next = new IP2Region({
+        ipv4db,
         ipv6db: process.env.IP2REGION_DB_V6,
       });
+      instance = next;
+      loadedFile = ipv4db;
     }
 
     return instance;

@@ -327,6 +327,10 @@ body.waline-body {
   letter-spacing: -0.02em;
 }
 
+.typecho-page-title.waline-comments-title h2 {
+  font-size: 1.7rem;
+}
+
 .typecho-page-title::after {
   content: '';
   display: block;
@@ -747,6 +751,10 @@ button.operate-button-delete:hover {
     font-size: 1.6rem;
   }
 
+  .typecho-page-title.waline-comments-title h2 {
+    font-size: 1.4rem;
+  }
+
   .typecho-list-operate form,
   .typecho-list-operate .operate,
   .typecho-list-operate .search {
@@ -1134,6 +1142,31 @@ button.operate-reply {
   display: block;
   margin-top: 8px;
 }
+.waline-region-database {
+  border-color: var(--wa-border);
+  background: var(--wa-surface);
+  color: var(--wa-text);
+}
+.waline-database-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  flex-basis: 100%;
+}
+.waline-database-status {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 8px 18px;
+  margin: 20px 0 0;
+  font-size: 0.9em;
+}
+.waline-database-status dt {
+  color: var(--wa-text-soft);
+}
+.waline-database-status dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
 .waline-management-tabs {
   display: flex;
   flex-wrap: wrap;
@@ -1171,4 +1204,62 @@ button.operate-reply {
 .waline-region-settings h3,
 .waline-region-audit-card h3 {
   margin-top: 0;
+}
+
+.waline-level-settings {
+  padding: 18px;
+  border: 1px solid var(--wa-border);
+  border-radius: 14px;
+  background: var(--wa-surface);
+  color: var(--wa-text);
+}
+.waline-level-settings fieldset {
+  min-width: 0;
+  padding: 0;
+  border: 0;
+}
+.waline-level-toggle {
+  display: block;
+  margin-bottom: 20px;
+}
+.waline-level-rows {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 20px;
+}
+.waline-level-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 12px;
+}
+.waline-level-row > span {
+  align-self: center;
+  min-width: 5em;
+}
+.waline-level-row label {
+  display: grid;
+  flex: 1 1 180px;
+  gap: 6px;
+  min-width: 0;
+}
+.waline-level-row input {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 38px;
+  padding: 8px 10px;
+  border: 1px solid var(--wa-border-strong);
+  border-radius: var(--wa-radius-sm);
+  background: var(--wa-surface-strong);
+  color: var(--wa-text);
+  font: inherit;
+}
+.waline-level-row input:focus {
+  outline: 2px solid var(--wa-accent-strong);
+  outline-offset: 2px;
+}
+.waline-settings-tip {
+  color: var(--wa-text-soft);
+  font-size: 0.9em;
+  line-height: 1.7;
 }

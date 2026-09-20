@@ -1,6 +1,6 @@
-name: Publish @seiun/waline
+name: Release Waline
 
-# Only pushing an explicit version tag publishes images.
+# Run on a new version tag; manual runs must also select a version tag.
 on:
   workflow_dispatch:
   push:
@@ -18,13 +18,12 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  docker:
+  validate:
+    name: Validate version tag
     if: github.repository == 'zhangyxXyz/waline' && startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      packages: write
-      actions: write
     steps:
       - uses: actions/checkout@v7
         with:
@@ -41,9 +40,31 @@ jobs:
           git merge-base --is-ancestor HEAD origin/dev || {
             echo 'Release tags must point to commits on dev'; exit 1;
           }
-      - uses: docker/setup-qemu-action@v4
+      - name: Reject an already published release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          VERSION: ${{ github.ref_name }}
+        run: |
+          gh api --paginate "repos/$GH_REPO/releases?per_page=100" > "$RUNNER_TEMP/releases.json"
+          if jq -s -e --arg version "$VERSION" 'any(.[][]; .tag_name == $version and .draft == false)' "$RUNNER_TEMP/releases.json"; then
+            echo 'This version is already published. Create a new version tag.'
+            exit 1
+          fi
+          if ! jq -s -e --arg version "$VERSION" 'any(.[][]; .tag_name == $version)' "$RUNNER_TEMP/releases.json"; then
+            gh release create "$VERSION" --draft --verify-tag --title "$VERSION" --notes 'Release build in progress.'
+          fi
+
+  build:
+    name: Test and build
+    needs: validate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
         with:
-          cache-image: false
+          persist-credentials: false
       - uses: docker/setup-buildx-action@v4
       - name: Build and test tagged source
         uses: docker/build-push-action@v7
@@ -54,6 +75,7 @@ jobs:
           load: true
           tags: waline-smoke:${{ github.sha }}
           cache-from: type=gha,scope=waline-fork
+          cache-to: type=gha,mode=max,scope=waline-fork
       - name: Smoke test packaged assets
         env:
           IMAGE: waline-smoke:${{ github.sha }}
@@ -63,12 +85,53 @@ jobs:
           trap 'docker logs "$container"; docker rm -f "$container"' EXIT
           docker exec "$container" node -e "const R=require('ip2region').default; const r=new R({ipv4db:'/app/data/ip2region-v4.db'}).search('43.132.141.24'); if(r.country!=='中国'||r.province!=='香港特别行政区')process.exit(1)"
           for attempt in $(seq 1 30); do
-            if docker exec "$container" node -e "Promise.all(['waline.js','waline.css','admin.js'].map(async file => {const r=await fetch('http://localhost:8360/assets/fork/'+file);if(!r.ok || !(await r.text()).length)throw Error(file);})).catch(()=>process.exit(1))"; then
+            if docker exec "$container" node -e "Promise.all(['waline.js','waline.css','waline-meta.css','admin.js'].map(async file => {const r=await fetch('http://localhost:8360/assets/fork/'+file);if(!r.ok || !(await r.text()).length)throw Error(file);})).catch(()=>process.exit(1))"; then
               exit 0
             fi
             sleep 2
           done
           exit 1
+      - name: Extract tested client assets
+        env:
+          IMAGE: waline-smoke:${{ github.sha }}
+        run: |
+          mkdir -p client-dist
+          container=$(docker create "$IMAGE")
+          trap 'docker rm -f "$container"' EXIT
+          for file in waline.js waline.css waline-meta.css; do
+            docker cp "$container:/app/public/fork/$file" "client-dist/$file"
+            test -s "client-dist/$file"
+          done
+          cp LICENSE client-dist/LICENSE
+          node --input-type=module -e 'import fs from "node:fs"; const pkg=JSON.parse(fs.readFileSync("packages/client/package.json","utf8")); fs.writeFileSync("client-dist/version.json", JSON.stringify({version:process.env.GITHUB_REF_NAME,clientVersion:pkg.version,commit:process.env.GITHUB_SHA},null,2)+"\n");'
+      - name: Upload tested client to draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          VERSION: ${{ github.ref_name }}
+        run: |
+          test "$(gh release view "$VERSION" --json isDraft --jq .isDraft)" = true
+          tar --sort=name --mtime=@0 --owner=0 --group=0 --numeric-owner -czf tested-client.tar.gz -C client-dist .
+          gh release upload "$VERSION" tested-client.tar.gz --clobber
+
+  docker:
+    name: Build and publish Docker image
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      actions: write
+    outputs:
+      digest: ${{ steps.publish.outputs.digest }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: docker/setup-qemu-action@v4
+        with:
+          cache-image: false
+      - uses: docker/setup-buildx-action@v4
       - uses: docker/login-action@v4
         with:
           registry: ghcr.io
@@ -109,11 +172,62 @@ jobs:
           GH_REPO: ${{ github.repository }}
           KEEP_CACHE_REF: ${{ github.ref }}
         run: python3 scripts/cleanup-release-caches.py
-      - name: Publish release notes
+
+  client:
+    name: Package client JS and CSS
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      VERSION: ${{ github.ref_name }}
+    steps:
+      - name: Download tested client from draft release
+        run: |
+          test "$(gh release view "$VERSION" --json isDraft --jq .isDraft)" = true
+          gh release download "$VERSION" --pattern tested-client.tar.gz
+          mkdir -p client-dist
+          tar -xzf tested-client.tar.gz -C client-dist
+      - name: Create client archive and checksums
+        run: |
+          for file in waline.js waline.css waline-meta.css LICENSE version.json; do
+            test -s "client-dist/$file"
+          done
+          mkdir -p release-assets
+          tar --sort=name --mtime=@0 --owner=0 --group=0 --numeric-owner -czf release-assets/waline-client.tar.gz -C client-dist .
+          cd release-assets
+          sha256sum waline-client.tar.gz > SHA256SUMS
+          sha256sum --check SHA256SUMS
+      - name: Upload client package to draft release
+        run: |
+          test "$(gh release view "$VERSION" --json isDraft --jq .isDraft)" = true
+          gh release upload "$VERSION" release-assets/waline-client.tar.gz release-assets/SHA256SUMS --clobber
+
+  release:
+    name: Publish GitHub Release
+    needs: [docker, client]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      VERSION: ${{ github.ref_name }}
+    steps:
+      - name: Download final client package from draft release
+        run: |
+          test "$(gh release view "$VERSION" --json isDraft --jq .isDraft)" = true
+          gh release download "$VERSION" --pattern waline-client.tar.gz --pattern SHA256SUMS --dir release-assets
+      - name: Verify release assets
+        working-directory: release-assets
+        run: sha256sum --check SHA256SUMS
+      - name: Publish release with client assets
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          DIGEST: ${{ steps.publish.outputs.digest }}
+          DIGEST: ${{ needs.docker.outputs.digest }}
           VERSION: ${{ github.ref_name }}
         shell: bash
         run: |
@@ -128,7 +242,17 @@ jobs:
 
           Source commit: \`${{ github.sha }}\`.
 
+          ### Client package
+          Download \`waline-client.tar.gz\` and verify it with \`SHA256SUMS\`.
+          The archive contains \`waline.js\`, \`waline.css\`, \`waline-meta.css\`, \`LICENSE\` and \`version.json\`.
+          These client assets were extracted from the tested image built from this source commit.
+          This version tag is intentionally reused for this update. Pin the client SHA-256 and image digest to identify the exact build.
+
           ### Features
+          - Administrator-only level settings: enable badges, edit up to 20 thresholds and names, and persist changes without restarting.
+          - Client locale overrides take priority over server labels; blank names use the client language defaults.
+          - IP database settings support manual or scheduled official IPv4 updates with validation and fallback to the previous database.
+          - Level and IP management UI strings support Simplified Chinese, Traditional Chinese and English, with English fallback for other languages.
           - Signed-in visitors can send top-level private messages to the site owner. Subsequent replies retain the same two participants; site administrators can moderate them (MySQL required).
           - With multiple administrators, set PRIVATE_MESSAGE_ADMIN_ID to select the site owner. Anonymous private messages and client-supplied recipients are rejected.
           - Configurable IP region precision and country prefix; raw IP addresses remain administrator-only.
@@ -143,17 +267,12 @@ jobs:
           Do not roll back to a server that ignores visibility fields after private replies have been created.
           Persist /app/runtime using a writable host mount so dashboard region settings survive container recreation. Saved dashboard settings override environment defaults.
 
-          This tag was intentionally reused for the dashboard update. Deployments pinned to the previous image digest remain unchanged until explicitly updated.
           EOF
-          if gh release view "$VERSION" >/dev/null 2>&1; then
-            gh release edit "$VERSION" --title "$VERSION" --notes-file "$RUNNER_TEMP/release-notes.md"
-          else
-            gh release create "$VERSION" --verify-tag --title "$VERSION" --notes-file "$RUNNER_TEMP/release-notes.md"
+          test "$(gh release view "$VERSION" --json isDraft --jq .isDraft)" = true || {
+            echo 'Refusing to modify a published release'; exit 1;
+          }
+          gh release edit "$VERSION" --title "$VERSION" --notes-file "$RUNNER_TEMP/release-notes.md"
+          if gh release view "$VERSION" --json assets --jq '.assets[].name' | grep -Fxq tested-client.tar.gz; then
+            gh release delete-asset "$VERSION" tested-client.tar.gz --yes
           fi
-      - name: Clean temporary runner data
-        if: always()
-        env:
-          IMAGE: waline-smoke:${{ github.sha }}
-        run: |
-          docker image rm "$IMAGE" || true
-          docker buildx prune --all --force || true
+          gh release edit "$VERSION" --draft=false

@@ -143,6 +143,8 @@ export interface BaseWalineResponseComment {
    * 仅在 `LEVELS` 设置时可用
    */
   level?: number;
+  /** Level label configured by the server administrator. */
+  levelLabel?: string;
 
   /**
    * User label

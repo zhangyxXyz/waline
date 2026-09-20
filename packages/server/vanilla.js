@@ -21,3 +21,5 @@ try {
 for (const k in config) {
   think.config(k, config[k]);
 }
+
+require('./src/service/region-database.js').startScheduler();

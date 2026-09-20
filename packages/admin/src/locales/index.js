@@ -11,6 +11,9 @@ import ru from './ru.json';
 import viVN from './vi-VN.json';
 import zhCN from './zh-CN.json';
 import zhTW from './zh-TW.json';
+import managementEn from './management-en.json';
+import managementZhCN from './management-zh-CN.json';
+import managementZhTW from './management-zh-TW.json';
 
 export const LANGUAGE_OPTIONS = [
   {
@@ -80,7 +83,7 @@ export const LANGUAGE_OPTIONS = [
   },
 ];
 
-export default {
+const resources = {
   'zh-cn': { translations: zhCN },
   'zh-CN': { translations: zhCN },
   en: { translations: en },
@@ -105,3 +108,21 @@ export default {
   es: { translations: es },
   'es-MX': { translations: es },
 };
+
+// New management strings fall back to English until a translation is available.
+export default Object.fromEntries(
+  Object.entries(resources).map(([language, resource]) => [
+    language,
+    {
+      translations: {
+        ...managementEn,
+        ...resource.translations,
+        ...(['zh-CN', 'zh-cn'].includes(language)
+          ? managementZhCN
+          : language === 'zh-TW'
+            ? managementZhTW
+            : {}),
+      },
+    },
+  ]),
+);
