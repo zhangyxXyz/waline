@@ -54,7 +54,7 @@ export default function ServiceSettings({ section }) {
   );
   return (
     <section className="waline-region-settings">
-      <h3>{t(section === 'auth' ? 'settings.auth' : 'settings.comments')}</h3>
+      <h3>{t(`settings.${section}`)}</h3>
       {data && (
         <>
           {section === 'auth' ? (
@@ -103,6 +103,12 @@ export default function ServiceSettings({ section }) {
                 </table>
               </div>
               <p>{t('settings.providerTip')}</p>
+            </>
+          ) : section === 'images' ? (
+            <>
+              {check('enabled', 'settings.imagesEnabled')}
+              <p>{t('settings.imagesTip')}</p>
+              <p>{t('settings.imagesStorageTip')}</p>
             </>
           ) : (
             <>

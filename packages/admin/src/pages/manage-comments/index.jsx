@@ -317,6 +317,13 @@ export default function ManageComments() {
             <nav className="waline-management-tabs" aria-label={t('management.tabs')}>
               <button
                 type="button"
+                aria-pressed={activePanel === 'comments'}
+                onClick={() => setActivePanel('comments')}
+              >
+                {t('manage comments')}
+              </button>
+              <button
+                type="button"
                 aria-pressed={activePanel === 'service'}
                 onClick={() => setActivePanel('service')}
               >
@@ -324,10 +331,10 @@ export default function ManageComments() {
               </button>
               <button
                 type="button"
-                aria-pressed={activePanel === 'comments'}
-                onClick={() => setActivePanel('comments')}
+                aria-pressed={activePanel === 'images'}
+                onClick={() => setActivePanel('images')}
               >
-                {t('manage comments')}
+                {t('settings.images')}
               </button>
               <button
                 type="button"
@@ -348,17 +355,24 @@ export default function ManageComments() {
           <div className="typecho-page-title waline-comments-title">
             <h2>
               {t(
-                activePanel === 'service'
-                  ? 'settings.comments'
-                  : activePanel === 'ip'
-                    ? 'region.title'
-                    : activePanel === 'levels'
-                      ? 'levels.title'
-                      : 'manage comments',
+                activePanel === 'images'
+                  ? 'settings.images'
+                  : activePanel === 'service'
+                    ? 'settings.comments'
+                    : activePanel === 'ip'
+                      ? 'region.title'
+                      : activePanel === 'levels'
+                        ? 'levels.title'
+                        : 'manage comments',
               )}
             </h2>
           </div>
           <main className="row typecho-page-main">
+            {user?.type === 'administrator' && activePanel === 'images' && (
+              <div className="waline-ip-panel">
+                <ServiceSettings section="images" />
+              </div>
+            )}
             {user?.type === 'administrator' && activePanel === 'service' && (
               <div className="waline-ip-panel">
                 <ServiceSettings section="comments" />

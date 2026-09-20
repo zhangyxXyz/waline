@@ -19,6 +19,9 @@ module.exports = class extends Base {
       case 'comments': {
         return this.success(settings.comments());
       }
+      case 'images': {
+        return this.success(settings.images());
+      }
       case 'mail': {
         return this.success(mail.get(this.get('language'), this.get('kind'), this.config()));
       }
@@ -36,6 +39,9 @@ module.exports = class extends Base {
       case 'comments': {
         return this.success(settings.saveComments(this.post()));
       }
+      case 'images': {
+        return this.success(settings.saveImages(this.post()));
+      }
       case 'mail': {
         return this.success(mail.save(this.post(), this.config()));
       }
@@ -46,10 +52,11 @@ module.exports = class extends Base {
   }
   async postAction() {
     this.check();
-    if (this.get('section') === 'download-test')
-      {return this.success(
+    if (this.get('section') === 'download-test') {
+      return this.success(
         await require('../service/region-database.js').testConnection(this.post()),
-      );}
+      );
+    }
     if (this.get('section') === 'mail-preview') return this.success(mail.preview(this.post()));
     return this.ctx.throw(400);
   }

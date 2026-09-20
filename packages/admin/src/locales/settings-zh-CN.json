@@ -1,4 +1,8 @@
 {
+  "settings.images": "图片上传",
+  "settings.imagesEnabled": "允许上传图片",
+  "settings.imagesTip": "关闭后，适配此设置的客户端将隐藏上传按钮，禁用粘贴、拖拽及自定义函数上传。保存后刷新评论页面生效。这仅控制上传入口，不拦截手动填写的图片链接，也不影响已有图片。",
+  "settings.imagesStorageTip": "默认将不超过 128,000 字节的图片转为 Base64，随评论保存。客户端可以通过 imageUploader 自定义函数接入外部图床，或用 imageUploader: false 单独关闭上传。此处开启不会覆盖客户端的关闭设置。私密评论仍不开放上传。",
   "settings.auth": "注册与登录",
   "settings.comments": "评论服务",
   "settings.registration": "开放新用户注册",

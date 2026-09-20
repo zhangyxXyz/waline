@@ -28,6 +28,11 @@ const save = (section, value) => {
 };
 const auth = () => ({ registration: true, email: true, providers: null, ...read().auth });
 const comments = () => ({ enabled: true, allowAdmin: false, ...read().comments });
+const images = () => ({ enabled: read().images?.enabled !== false });
+const saveImages = (value) => {
+  if (!value || typeof value.enabled !== 'boolean') throw invalid();
+  return save('images', { enabled: value.enabled });
+};
 const allowed = (user) => {
   const config = comments();
   return config.enabled || (config.allowAdmin && user?.type === 'administrator');
@@ -68,4 +73,16 @@ const saveComments = (value) => {
   }
   return save('comments', { enabled: value.enabled, allowAdmin: value.allowAdmin });
 };
-module.exports = { read, save, auth, comments, allowed, provider, saveAuth, saveComments, invalid };
+module.exports = {
+  read,
+  save,
+  auth,
+  comments,
+  images,
+  saveImages,
+  allowed,
+  provider,
+  saveAuth,
+  saveComments,
+  invalid,
+};

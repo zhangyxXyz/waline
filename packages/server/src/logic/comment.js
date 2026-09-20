@@ -23,6 +23,7 @@ module.exports = class CommentLogic extends Base {
     }
 
     switch (type) {
+      case 'image-upload':
       case 'service-status': {
         return;
       }

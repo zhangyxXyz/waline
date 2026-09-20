@@ -113,8 +113,10 @@ module.exports = class CommentController extends BaseRest {
 
   async getAction() {
     this.ctx.set('Cache-Control', 'private, no-store');
-    if (this.get('type') === 'service-status')
-      {return this.success({ enabled: dashboard.allowed(this.ctx.state.userInfo) });}
+    if (this.get('type') === 'image-upload') return this.success(dashboard.images());
+    if (this.get('type') === 'service-status') {
+      return this.success({ enabled: dashboard.allowed(this.ctx.state.userInfo) });
+    }
     if (this.get('type') === 'level-settings') {
       if (this.ctx.state.userInfo?.type !== 'administrator') return this.ctx.throw(403);
       this.ctx.set('Cache-Control', 'private, no-store');
@@ -203,8 +205,9 @@ module.exports = class CommentController extends BaseRest {
       if (this.ctx.state.userInfo?.type !== 'administrator') return this.ctx.throw(403);
       return this.success(regionDatabase.startUpdate());
     }
-    if (!dashboard.allowed(this.ctx.state.userInfo))
-      {return this.ctx.throw(403, this.locale('Comments are closed'));}
+    if (!dashboard.allowed(this.ctx.state.userInfo)) {
+      return this.ctx.throw(403, this.locale('Comments are closed'));
+    }
     think.logger.debug('Post Comment Start!');
 
     const { comment, link, mail, nick, pid, rid, ua, url, at } = this.post();
@@ -442,8 +445,9 @@ module.exports = class CommentController extends BaseRest {
       return this.success(regionSettings.write(this.post()));
     }
     const { userInfo } = this.ctx.state;
-    if (userInfo?.type !== 'administrator' && !dashboard.allowed(userInfo))
-      {return this.ctx.throw(403, this.locale('Comments are closed'));}
+    if (userInfo?.type !== 'administrator' && !dashboard.allowed(userInfo)) {
+      return this.ctx.throw(403, this.locale('Comments are closed'));
+    }
     const isAdmin = userInfo.type === 'administrator';
     // Ownership, audience and topology are immutable even for administrators.
     const data = isAdmin

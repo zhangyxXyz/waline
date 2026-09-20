@@ -31,7 +31,7 @@ const load = (name) => {
     think,
     fetch: async () => ({ json: async () => ({ id: 'social-id', name: 'New user' }) }),
     require: (id) => {
-      if (id.endsWith('rest.js')) return class {};
+      if (id.endsWith('rest.js') || id.endsWith('base.js')) return class {};
       if (id.includes('dashboard-settings')) return store;
       if (id === 'jsonwebtoken') return { sign: () => 'signed-token' };
       if (id.includes('markdown')) return { getMarkdownParser: () => (value) => value };
@@ -61,6 +61,18 @@ test('registration, OAuth binding and public comment shutdown', async (t) => {
   const previous = process.env.DASHBOARD_SETTINGS_FILE;
   process.env.DASHBOARD_SETTINGS_FILE = path.join(dir, 'settings.json');
   try {
+    await t.test('image policy is public and does not require a comment path', async () => {
+      const logic = instance(load('logic/comment.js'), {}, { type: 'image-upload' });
+      logic.getAction();
+      assert.equal(logic.rules, undefined);
+      store.saveImages({ enabled: false });
+      const result = await instance(
+        load('controller/comment.js'),
+        {},
+        { type: 'image-upload' },
+      ).getAction();
+      assert.deepEqual(result, { enabled: false });
+    });
     await t.test('registration combinations and strict setting validation', async () => {
       const User = load('controller/user.js');
       for (const [registration, email] of [

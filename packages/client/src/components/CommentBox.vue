@@ -2,7 +2,7 @@
 //
 import { useDebounceFn, useEventListener, watchImmediate } from '@vueuse/core';
 import type { WalineComment, WalineCommentData, UserInfo } from '@waline/api';
-import { addComment, login, updateComment } from '@waline/api';
+import { addComment, getImageUploadSettings, login, updateComment } from '@waline/api';
 import autosize from 'autosize';
 import type { DeepReadonly, CSSProperties } from 'vue';
 import {
@@ -170,7 +170,26 @@ const locale = computed(() => config.value.locale);
 
 const isLogin = computed(() => Boolean(userInfo.value.token));
 
-const canUploadImage = computed(() => !isPrivate.value && config.value.imageUploader != null);
+const imageUploadEnabled = ref(false);
+watch(
+  () => config.value.serverURL,
+  (serverURL, _previous, onCleanup) => {
+    const controller = new AbortController();
+    imageUploadEnabled.value = false;
+    onCleanup(() => controller.abort());
+    void getImageUploadSettings({ serverURL, signal: controller.signal })
+      .then((enabled) => {
+        if (!controller.signal.aborted) imageUploadEnabled.value = enabled;
+      })
+      .catch(() => {
+        // Keep uploads disabled when the server policy cannot be verified.
+      });
+  },
+  { immediate: true },
+);
+const canUploadImage = computed(
+  () => imageUploadEnabled.value && !isPrivate.value && config.value.imageUploader != null,
+);
 
 const insert = (text: string): void => {
   // oxlint-disable-next-line typescript/no-non-null-assertion

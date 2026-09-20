@@ -1,4 +1,8 @@
 {
+  "settings.images": "Image uploads",
+  "settings.imagesEnabled": "Allow image uploads",
+  "settings.imagesTip": "When disabled, compatible clients hide the upload button and disable paste and drag-and-drop uploads, including custom upload functions. Refresh the comment page after saving. This controls upload tools only: manually entered image links and existing images are not blocked.",
+  "settings.imagesStorageTip": "By default, images up to 128,000 bytes are stored with the comment as Base64. A client can use a custom imageUploader function for an external image host, or set imageUploader: false to disable uploads locally. Enabling this switch does not override a local disable. Private comment uploads remain disabled.",
   "settings.auth": "Registration and sign-in",
   "settings.comments": "Comment service",
   "settings.registration": "Allow new registrations",

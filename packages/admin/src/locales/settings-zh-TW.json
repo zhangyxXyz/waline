@@ -1,4 +1,8 @@
 {
+  "settings.images": "圖片上傳",
+  "settings.imagesEnabled": "允許上傳圖片",
+  "settings.imagesTip": "關閉後，支援此設定的客戶端將隱藏上傳按鈕，停用貼上、拖曳及自訂函式上傳。儲存後重新整理評論頁面生效。這僅控制上傳入口，不阻擋手動填寫的圖片連結，也不影響既有圖片。",
+  "settings.imagesStorageTip": "預設將不超過 128,000 位元組的圖片轉為 Base64，隨評論儲存。客戶端可透過 imageUploader 自訂函式接入外部圖床，或用 imageUploader: false 單獨關閉上傳。此處開啟不會覆蓋客戶端的關閉設定。私密評論仍不開放上傳。",
   "settings.auth": "註冊與登入",
   "settings.comments": "評論服務",
   "settings.registration": "開放新使用者註冊",

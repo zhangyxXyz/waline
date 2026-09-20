@@ -1,5 +1,6 @@
 export * from './articleCounter.js';
 export * from './comment.js';
+export * from './imageUpload.js';
 export * from './commentCount.js';
 export * from './login.js';
 export * from './pageview.js';
