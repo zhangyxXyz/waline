@@ -249,6 +249,9 @@ jobs:
           This version tag is intentionally reused for this update. Pin the client SHA-256 and image digest to identify the exact build.
 
           ### Features
+          - Image upload dashboard switch controls the matching client's button, paste and drag-and-drop tools; manual image URLs and existing images remain unaffected.
+          - SMTP settings precede mail templates, support environment defaults and custom TLS settings, and never return saved passwords to the browser.
+          - Top-level private messages now include the private visibility flag when submitted, just like private replies.
           - Dashboard registration controls: global and email switches, per-provider login and binding permissions, and matching hidden registration links.
           - Public comment service switch with optional administrator access; dashboard moderation remains available.
           - Separate multilingual reply and site-owner email templates with variable insertion, sandboxed previews and restore defaults.
