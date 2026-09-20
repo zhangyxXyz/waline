@@ -2,14 +2,19 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import Header from '../../components/Header.jsx';
+import { LANGUAGE_OPTIONS } from '../../locales/index.js';
 import request from '../../utils/request.js';
 
 import './style.css';
 
 export default function Mail() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [kind, setKind] = useState('reply');
-  const [language, setLanguage] = useState('zh-cn');
+  const normalizeLanguage = (value) =>
+    ({ en: 'en-us', 'es-mx': 'es', 'ko-kr': 'ko', 'jp-jp': 'jp', 'vi-vn': 'vi' })[
+      value.toLowerCase()
+    ] || value.toLowerCase();
+  const [language, setLanguage] = useState(() => normalizeLanguage(i18n.language || 'en-US'));
   const [data, setData] = useState(null);
   const [busy, setBusy] = useState(false);
   const [dirty, setDirty] = useState(false);
@@ -135,7 +140,8 @@ export default function Mail() {
                   'vi',
                 ].map((lang) => (
                   <option key={lang} value={lang}>
-                    {{ 'zh-cn': '简体中文', 'zh-tw': '繁體中文', 'en-us': 'English' }[lang] || lang}
+                    {LANGUAGE_OPTIONS.find(({ value }) => normalizeLanguage(value) === lang)
+                      ?.label || lang}
                   </option>
                 ))}
               </select>
