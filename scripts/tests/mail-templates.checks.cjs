@@ -19,6 +19,11 @@ test('mail templates: language isolation, validation, restore and actual sender 
       body: '<p>{{parent.nick}}: {{self.comment | safe}}</p>',
     };
     await t.test('all language defaults can be previewed', () => {
+      assert.equal(
+        mail.get('es-MX', 'reply').body,
+        require('../../packages/server/src/locales/es.json').MAIL_TEMPLATE,
+      );
+      assert.equal(mail.language('esMX'), 'es');
       for (const language of mail.languages)
         for (const kind of ['reply', 'admin']) {
           const value = mail.get(language, kind);

@@ -22,6 +22,7 @@ const language = (value = 'en-us') => {
     {
       en: 'en-us',
       'es-mx': 'es',
+      esmx: 'es',
       'ko-kr': 'ko',
       'jp-jp': 'jp',
       'ja-jp': 'jp',
@@ -55,8 +56,9 @@ const validate = (value) => {
     value.subject.length > 300 ||
     value.body.length > 100000 ||
     /[\r\n]/u.test(value.subject)
-  )
-    {throw store.invalid();}
+  ) {
+    throw store.invalid();
+  }
   for (const [part, source] of [
     ['subject', value.subject],
     ['body', value.body],
@@ -80,7 +82,9 @@ const validate = (value) => {
 const defaults = (lang, kind, config = {}) => {
   const suffix = kind === 'admin' ? '_ADMIN' : '';
   const pick = (key) =>
-    config.locales?.[lang]?.[key] || locales[lang]?.[key] || locales['en-us'][key];
+    config.locales?.[lang]?.[key] ||
+    locales[lang === 'es' ? 'esMX' : lang]?.[key] ||
+    locales['en-us'][key];
   return {
     subject: (
       config[kind === 'admin' ? 'mailSubjectAdmin' : 'mailSubject'] || pick(`MAIL_SUBJECT${suffix}`)
