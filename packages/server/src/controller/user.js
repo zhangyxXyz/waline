@@ -63,14 +63,15 @@ module.exports = class UserController extends BaseRest {
 
   async postAction() {
     const registration = dashboard.auth();
-    if (!registration.registration || !registration.email)
-      {return this.ctx.throw(403, this.locale('Registration is closed'));}
+    if (!registration.registration || !registration.email) {
+      return this.ctx.throw(403, this.locale('Registration is closed'));
+    }
     const data = this.post('display_name,email,url,password');
     const resp = await this.modelInstance.select({
       email: data.email,
     });
 
-    if (!think.isEmpty(resp) && ['administrator', 'guest'].includes(resp[0].type)) {
+    if (!think.isEmpty(resp) && !resp[0].type.startsWith('verify:')) {
       return this.fail(this.locale('USER_EXIST'));
     }
 

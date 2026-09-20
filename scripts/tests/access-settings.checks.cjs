@@ -81,6 +81,17 @@ test('registration, OAuth binding and public comment shutdown', async (t) => {
         ),
       );
     });
+    await t.test('email signup cannot overwrite active or banned accounts', async () => {
+      auth();
+      const User = load('controller/user.js');
+      for (const type of ['administrator', 'guest', 'banned']) {
+        const user = instance(User, {});
+        user.post = () => ({ email: 'existing@example.invalid' });
+        user.modelInstance = { select: async () => [{ type }] };
+        user.fail = (message) => ({ error: message });
+        assert.equal((await user.postAction()).error, 'USER_EXIST');
+      }
+    });
     await t.test(
       'OAuth: total switch blocks new users but keeps existing login and binding',
       async () => {
