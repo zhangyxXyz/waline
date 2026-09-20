@@ -326,8 +326,8 @@ const submitComment = async (): Promise<void> => {
     comment.pid = props.replyId;
     comment.rid = props.rootId;
     comment.at = props.replyUser;
-    if (!props.edit && isPrivate.value) comment.visibility = 'private';
   }
+  if (!props.edit && isPrivate.value) comment.visibility = 'private';
 
   isSubmitting.value = true;
 
