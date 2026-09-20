@@ -26,7 +26,16 @@ export default function RegionDatabase() {
         if (!next.running) {
           setMessage((current) => (current === 'database.started' ? '' : current));
         }
-        setConfig((current) => current || { source: next.source, interval: next.interval });
+        setConfig(
+          (current) =>
+            current || {
+              source: next.source,
+              interval: next.interval,
+              route: next.route || 'official',
+              customType: next.customType || 'prefix',
+              customURL: next.customURL || '',
+            },
+        );
       } catch {
         if (active) setMessage('database.loadFailed');
       } finally {
@@ -60,6 +69,22 @@ export default function RegionDatabase() {
     }
   };
   const disabled = busy || data?.running || data?.external;
+  const [connection, setConnection] = useState('');
+  const testConnection = async () => {
+    setBusy(true);
+    setConnection(t('download.testing'));
+    try {
+      const result = await request('settings?section=download-test', {
+        method: 'POST',
+        body: config,
+      });
+      setConnection(t('download.success', { status: result.status, elapsed: result.elapsed }));
+    } catch (error) {
+      setConnection(`${t('download.failed')}: ${error.message}`);
+    } finally {
+      setBusy(false);
+    }
+  };
   return (
     <section className="waline-region-settings waline-region-database" aria-busy={busy}>
       <h3>{t('database.title')}</h3>
@@ -90,6 +115,58 @@ export default function RegionDatabase() {
             <small>{t('database.languageTip')}</small>
             {config.source === 'official' ? (
               <>
+                <label>
+                  {t('download.route')}{' '}
+                  <select
+                    value={config.route}
+                    disabled={disabled}
+                    onChange={(event) => setConfig({ ...config, route: event.target.value })}
+                  >
+                    {['official', 'ghproxy', 'custom'].map((route) => (
+                      <option key={route} value={route}>
+                        {t(`download.${route}`)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                {config.route === 'custom' && (
+                  <>
+                    <label>
+                      {t('download.type')}{' '}
+                      <select
+                        disabled={disabled}
+                        value={config.customType}
+                        onChange={(event) =>
+                          setConfig({ ...config, customType: event.target.value })
+                        }
+                      >
+                        <option value="prefix">{t('download.prefix')}</option>
+                        <option value="url">{t('download.url')}</option>
+                      </select>
+                    </label>
+                    <label>
+                      {t('download.address')}{' '}
+                      <input
+                        type="url"
+                        disabled={disabled}
+                        value={config.customURL}
+                        placeholder={
+                          config.customType === 'prefix'
+                            ? 'https://proxy.example.com/'
+                            : 'https://example.com/ipv4_source.txt'
+                        }
+                        onChange={(event) =>
+                          setConfig({ ...config, customURL: event.target.value })
+                        }
+                      />
+                    </label>
+                  </>
+                )}
+                <small>{t('download.tip')}</small>
+                <button type="button" className="btn" disabled={disabled} onClick={testConnection}>
+                  {t('download.test')}
+                </button>
+                <output aria-live="polite">{connection}</output>
                 <label>
                   {t('database.schedule')}{' '}
                   <select
@@ -142,6 +219,18 @@ export default function RegionDatabase() {
             <dd>{date(data.updatedAt)}</dd>
           </dl>
           {data.external && <p>{t('database.externalTip')}</p>}
+          {data.running && data.phase && (
+            <p role="status">
+              {t(`download.${data.phase}`)}{' '}
+              {data.downloadedBytes != null && `${(data.downloadedBytes / 1048576).toFixed(2)} MiB`}
+              {data.totalBytes ? ` / ${(data.totalBytes / 1048576).toFixed(2)} MiB` : ''}
+            </p>
+          )}
+          {!data.running && data.error && (
+            <p className="waline-download-error">
+              {t('download.reason')}: {data.error}
+            </p>
+          )}
           <p role="status">
             {data.running
               ? t('database.running')

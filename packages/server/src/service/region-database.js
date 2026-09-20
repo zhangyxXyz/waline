@@ -2,22 +2,29 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { createHash, randomUUID } = require('node:crypto');
 const { isIPv4 } = require('node:net');
+const downloader = require('./database-download.js');
 
 const directory = () =>
   process.env.REGION_DATABASE_DIR || path.resolve(__dirname, '../../runtime/ip-region');
 const settingsFile = () => path.join(directory(), 'settings.json');
 const stateFile = () => path.join(directory(), 'state.json');
 const bundled = path.resolve(__dirname, '../../data/ip2region-v4.db');
-const defaults = { source: 'bundled', interval: 'off' };
+const defaults = {
+  source: 'bundled',
+  interval: 'off',
+  route: 'official',
+  customType: 'prefix',
+  customURL: '',
+};
 let running = false;
 let timer;
 
 const read = (file, fallback) => {
   try {
     return JSON.parse(fs.readFileSync(file, 'utf8'));
-  } catch (error) {
-    if (error.code === 'ENOENT') return fallback;
-    throw error;
+  } catch (err) {
+    if (err.code === 'ENOENT') return fallback;
+    throw err;
   }
 };
 const write = (file, value) => {
@@ -31,7 +38,7 @@ const write = (file, value) => {
   }
 };
 const external = () => process.env.IP2REGION_DB_V4 || process.env.IP2REGION_DB;
-const settings = () => read(settingsFile(), defaults);
+const settings = () => ({ ...defaults, ...read(settingsFile(), defaults) });
 const state = () => read(stateFile(), {});
 const activeFile = () => {
   if (external()) return external();
@@ -45,9 +52,9 @@ const activeFile = () => {
 const locked = () => {
   try {
     return Date.now() - fs.statSync(path.join(directory(), 'update.lock')).mtimeMs < 15 * 60_000;
-  } catch (error) {
-    if (error.code === 'ENOENT') return false;
-    throw error;
+  } catch (err) {
+    if (err.code === 'ENOENT') return false;
+    throw err;
   }
 };
 const status = () => ({
@@ -66,20 +73,31 @@ const save = (value) => {
     throw Object.assign(new Error('Invalid database settings'), { status: 400 });
   }
   if (external())
-    throw Object.assign(new Error('Database is configured by environment'), { status: 409 });
-  write(settingsFile(), { source: value.source, interval: value.interval });
+    {throw Object.assign(new Error('Database is configured by environment'), { status: 409 });}
+  const download = downloader.configuration(value);
+  if (running || locked()) throw Object.assign(new Error('An update is running'), { status: 409 });
+  write(settingsFile(), { source: value.source, interval: value.interval, ...download });
   return status();
 };
 
-async function download(url, limit, signal, etag) {
-  const response = await fetch(url, {
-    signal,
-    headers: {
-      'User-Agent': 'Waline-IP-Database-Updater',
-      ...(etag ? { 'If-None-Match': etag } : {}),
-    },
-    redirect: 'error',
-  });
+async function download(config, limit, signal, etag, progress) {
+  const headerAbort = new AbortController();
+  const headerTimer = setTimeout(
+    () => headerAbort.abort(new Error('Connection timed out after 30 seconds')),
+    30000,
+  );
+  let response;
+  try {
+    response = await downloader.fetchSource(config, {
+      signal: AbortSignal.any([signal, headerAbort.signal]),
+      headers: {
+        'User-Agent': 'Waline-IP-Database-Updater',
+        ...(etag ? { 'If-None-Match': etag } : {}),
+      },
+    });
+  } finally {
+    clearTimeout(headerTimer);
+  }
   if (response.status === 304) return { unchanged: true };
   if (!response.ok) throw new Error(`Upstream HTTP ${response.status}`);
   const buffers = [];
@@ -88,6 +106,7 @@ async function download(url, limit, signal, etag) {
     length += chunk.length;
     if (length > limit) throw new Error('Upstream file exceeds size limit');
     buffers.push(chunk);
+    progress(length, Number(response.headers.get('content-length')) || null);
   }
   return { data: Buffer.concat(buffers), etag: response.headers.get('etag') };
 }
@@ -103,7 +122,7 @@ async function convert(source) {
     if (!line.trim()) continue;
     const fields = line.split('|');
     if (fields.length !== 7 || !isIPv4(fields[0]) || !isIPv4(fields[1]))
-      throw new Error('Invalid upstream row');
+      {throw new Error('Invalid upstream row');}
     const integer = (ip) => ip.split('.').reduce((n, octet) => n * 256 + Number(octet), 0);
     const start = integer(fields[0]);
     const end = integer(fields[1]);
@@ -113,7 +132,7 @@ async function convert(source) {
     if (!pointers.has(region)) {
       const record = Buffer.concat([Buffer.alloc(4), Buffer.from(region)]);
       if (record.length >= 256 || offset >= 2 ** 24)
-        throw new Error('Database format limit exceeded');
+        {throw new Error('Database format limit exceeded');}
       pointers.set(region, offset + record.length * 2 ** 24);
       records.push(record);
       offset += record.length;
@@ -134,17 +153,41 @@ async function convert(source) {
 async function update() {
   const previous = state();
   const attemptedAt = new Date().toISOString();
-  write(stateFile(), { ...previous, attemptedAt, error: null });
+  const config = settings();
+  const downloadURL = downloader.address(config);
+  write(stateFile(), {
+    ...previous,
+    attemptedAt,
+    phase: 'connecting',
+    downloadedBytes: 0,
+    totalBytes: null,
+    error: null,
+  });
   try {
     const signal = AbortSignal.timeout(5 * 60_000);
     const hasPrevious =
       /^[a-f0-9]{64}$/.test(previous.databaseHash || '') &&
       fs.existsSync(path.join(directory(), `${previous.databaseHash}.db`));
     const response = await download(
-      'https://raw.githubusercontent.com/lionsoul2014/ip2region/master/data/ipv4_source.txt',
+      config,
       128 * 1024 * 1024,
       signal,
-      hasPrevious ? previous.etag : undefined,
+      hasPrevious && previous.downloadURL === downloadURL ? previous.etag : undefined,
+      (() => {
+        let last = 0;
+        return (downloadedBytes, totalBytes) => {
+          if (Date.now() - last < 1000 && downloadedBytes !== totalBytes) return;
+          last = Date.now();
+          write(stateFile(), {
+            ...previous,
+            attemptedAt,
+            phase: 'downloading',
+            downloadedBytes,
+            totalBytes,
+            error: null,
+          });
+        };
+      })(),
     );
     if (response.unchanged) {
       if (!hasPrevious) throw new Error('No local database for unchanged response');
@@ -152,6 +195,7 @@ async function update() {
         ...previous,
         attemptedAt,
         checkedAt: new Date().toISOString(),
+        phase: 'done',
         error: null,
       });
       return;
@@ -163,12 +207,22 @@ async function update() {
       write(stateFile(), {
         ...previous,
         etag: response.etag,
+        downloadURL,
         attemptedAt,
         checkedAt: new Date().toISOString(),
+        phase: 'done',
         error: null,
       });
       return;
     }
+    write(stateFile(), {
+      ...previous,
+      attemptedAt,
+      phase: 'validating',
+      downloadedBytes: source.length,
+      totalBytes: source.length,
+      error: null,
+    });
     const { data, ranges } = await convert(source);
     const databaseHash = hash(data);
     const target = path.join(directory(), `${databaseHash}.db`);
@@ -178,7 +232,7 @@ async function update() {
       const IP2Region = require('ip2region').default;
       const reader = new IP2Region({ ipv4db: temporary });
       if (!reader.search('8.8.8.8')?.country || !reader.search('120.24.78.68')?.country)
-        throw new Error('Database read check failed');
+        {throw new Error('Database read check failed');}
       fs.renameSync(temporary, target);
     } finally {
       if (fs.existsSync(temporary)) fs.unlinkSync(temporary);
@@ -186,6 +240,10 @@ async function update() {
     const now = new Date().toISOString();
     write(stateFile(), {
       version,
+      downloadURL,
+      phase: 'done',
+      downloadedBytes: source.length,
+      totalBytes: source.length,
       etag: response.etag,
       databaseHash,
       sourceHash: version,
@@ -209,38 +267,39 @@ async function update() {
         }
       }
     }
-  } catch (error) {
+  } catch (err) {
     write(stateFile(), {
       ...previous,
       attemptedAt,
       // Keep diagnostics separate from the admin UI's translated failure message.
-      error: String(error.message),
+      phase: 'failed',
+      error: `${err.message}${err.cause?.code ? ` (${err.cause.code})` : ''}`,
     });
   }
 }
 
 const startUpdate = () => {
   if (external() || settings().source !== 'official')
-    throw Object.assign(new Error('Select official database first'), { status: 409 });
+    {throw Object.assign(new Error('Select official database first'), { status: 409 });}
   if (running || locked()) return status();
   fs.mkdirSync(directory(), { recursive: true });
   const lockFile = path.join(directory(), 'update.lock');
   try {
     if (Date.now() - fs.statSync(lockFile).mtimeMs >= 15 * 60_000) fs.unlinkSync(lockFile);
-  } catch (error) {
-    if (error.code !== 'ENOENT') throw error;
+  } catch (err) {
+    if (err.code !== 'ENOENT') throw err;
   }
   let lock;
   try {
     lock = fs.openSync(lockFile, 'wx');
-  } catch (error) {
-    if (error.code === 'EEXIST') return status();
-    throw error;
+  } catch (err) {
+    if (err.code === 'EEXIST') return status();
+    throw err;
   }
   fs.closeSync(lock);
   running = true;
   void update()
-    .catch((error) => console.error('IP database update failed:', error.message))
+    .catch((err) => console.error('IP database update failed:', err.message))
     .finally(() => {
       running = false;
       try {
@@ -257,8 +316,8 @@ const tick = () => {
     if (external() || config.source !== 'official' || config.interval === 'off') return;
     const period = config.interval === 'daily' ? 86_400_000 : 7 * 86_400_000;
     if (Date.now() - (Date.parse(state().attemptedAt) || 0) >= period) startUpdate();
-  } catch (error) {
-    console.error('IP database scheduler:', error.message);
+  } catch (err) {
+    console.error('IP database scheduler:', err.message);
   }
 };
 const startScheduler = () => {
@@ -268,4 +327,12 @@ const startScheduler = () => {
   timer.unref();
 };
 
-module.exports = { status, save, activeFile, startUpdate, startScheduler, convert };
+module.exports = {
+  status,
+  save,
+  activeFile,
+  startUpdate,
+  startScheduler,
+  convert,
+  testConnection: downloader.test,
+};

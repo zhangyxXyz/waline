@@ -46,6 +46,10 @@ module.exports = class extends Base {
   }
   async postAction() {
     this.check();
+    if (this.get('section') === 'download-test')
+      {return this.success(
+        await require('../service/region-database.js').testConnection(this.post()),
+      );}
     if (this.get('section') === 'mail-preview') return this.success(mail.preview(this.post()));
     return this.ctx.throw(400);
   }
