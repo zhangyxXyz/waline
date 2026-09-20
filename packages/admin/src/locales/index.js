@@ -6,14 +6,17 @@ import id from './id.json';
 import it from './it.json';
 import jp from './jp.json';
 import koKR from './ko-KR.json';
-import ptBR from './pt-BR.json';
-import ru from './ru.json';
-import viVN from './vi-VN.json';
-import zhCN from './zh-CN.json';
-import zhTW from './zh-TW.json';
 import managementEn from './management-en.json';
 import managementZhCN from './management-zh-CN.json';
 import managementZhTW from './management-zh-TW.json';
+import ptBR from './pt-BR.json';
+import ru from './ru.json';
+import settingsEn from './settings-en.json';
+import settingsZhCN from './settings-zh-CN.json';
+import settingsZhTW from './settings-zh-TW.json';
+import viVN from './vi-VN.json';
+import zhCN from './zh-CN.json';
+import zhTW from './zh-TW.json';
 
 export const LANGUAGE_OPTIONS = [
   {
@@ -116,6 +119,12 @@ export default Object.fromEntries(
     {
       translations: {
         ...managementEn,
+        ...settingsEn,
+        ...(['zh-CN', 'zh-cn'].includes(language)
+          ? settingsZhCN
+          : language === 'zh-TW'
+            ? settingsZhTW
+            : {}),
         ...resource.translations,
         ...(['zh-CN', 'zh-cn'].includes(language)
           ? managementZhCN

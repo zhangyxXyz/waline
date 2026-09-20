@@ -5,6 +5,7 @@ import { Route, BrowserRouter as Router, Routes } from 'react-router';
 import Access from './components/Access.jsx';
 import Forgot from './pages/forgot/index.jsx';
 import Login from './pages/login/index.jsx';
+import Mail from './pages/mail/index.jsx';
 import ManageComments from './pages/manage-comments/index.jsx';
 import Migration from './pages/migration/index.jsx';
 import Profile from './pages/profile/index.jsx';
@@ -19,6 +20,14 @@ export default function App() {
     <Provider store={store}>
       <Router basename={basePath}>
         <Routes>
+          <Route
+            path="/ui/mail"
+            element={
+              <Access meta={{ auth: 'administrator' }} basename={basePath}>
+                <Mail />
+              </Access>
+            }
+          />
           <Route
             path="/ui"
             exact

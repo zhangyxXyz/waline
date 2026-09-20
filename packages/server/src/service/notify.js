@@ -3,6 +3,8 @@ const crypto = require('node:crypto');
 const FormData = require('form-data');
 const nodemailer = require('nodemailer');
 const nunjucks = require('nunjucks');
+const mailTemplates = require('./mail-templates.js');
+const dashboardSettings = require('./dashboard-settings.js');
 
 module.exports = class NotifyService extends think.Service {
   constructor(controller) {
@@ -33,7 +35,7 @@ module.exports = class NotifyService extends think.Service {
     });
   }
 
-  async mail({ to, title, content }, self, parent) {
+  async mail({ to, title, content, templateKind }, self, parent) {
     if (!this.transporter) {
       return;
     }
@@ -49,8 +51,16 @@ module.exports = class NotifyService extends think.Service {
       },
     };
 
-    title = this.controller.locale(title, data);
-    content = this.controller.locale(content, data);
+    const lang = mailTemplates.language(this.controller.get('lang'));
+    const custom = templateKind && dashboardSettings.read().mail?.[lang]?.[templateKind];
+    if (custom) {
+      const rendered = mailTemplates.render(custom, data);
+      title = rendered.subject;
+      content = rendered.body;
+    } else {
+      title = this.controller.locale(title, data);
+      content = this.controller.locale(content, data);
+    }
 
     return this.transporter.sendMail({
       from: SENDER_EMAIL && SENDER_NAME ? `"${SENDER_NAME}" <${SENDER_EMAIL}>` : SMTP_USER,
@@ -520,7 +530,7 @@ module.exports = class NotifyService extends think.Service {
           think.isEmpty(item),
         )
       ) {
-        mailList.push({ to: AUTHOR_EMAIL, title, content });
+        mailList.push({ to: AUTHOR_EMAIL, title, content, templateKind: 'admin' });
       }
     }
 
@@ -536,6 +546,7 @@ module.exports = class NotifyService extends think.Service {
     ) {
       mailList.push({
         to: parent.mail,
+        templateKind: 'reply',
         title: mailSubject || 'MAIL_SUBJECT',
         content: mailTemplate || 'MAIL_TEMPLATE',
       });
