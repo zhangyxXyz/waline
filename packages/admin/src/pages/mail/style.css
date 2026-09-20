@@ -3,6 +3,22 @@
   padding: 0;
   min-width: 0;
 }
+.waline-smtp-editor fieldset {
+  border: 0;
+  padding: 0;
+  min-width: 0;
+}
+.waline-smtp-field {
+  display: block;
+  margin: 16px 0;
+}
+.waline-smtp-field input {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 640px;
+  margin-top: 8px;
+}
 .waline-mail-editor label {
   display: block;
   margin: 16px 0;

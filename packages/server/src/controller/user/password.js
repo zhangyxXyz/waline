@@ -1,12 +1,12 @@
 const jwt = require('jsonwebtoken');
 
 const BaseRest = require('../rest.js');
+const smtpSettings = require('../../service/smtp-settings.js');
 
 module.exports = class extends BaseRest {
   async putAction() {
-    const { SMTP_HOST, SMTP_SERVICE, SENDER_EMAIL, SENDER_NAME, SMTP_USER, SITE_NAME } =
-      process.env;
-    const hasMailService = SMTP_HOST || SMTP_SERVICE;
+    const { SITE_NAME } = process.env;
+    const hasMailService = smtpSettings.enabled();
 
     if (!hasMailService) {
       return this.fail();
@@ -25,7 +25,7 @@ module.exports = class extends BaseRest {
     const profileUrl = `${this.ctx.serverURL}/ui/profile?token=${token}`;
 
     await notify.transporter.sendMail({
-      from: SENDER_EMAIL && SENDER_NAME ? `"${SENDER_NAME}" <${SENDER_EMAIL}>` : SMTP_USER,
+      from: smtpSettings.from(),
       to: user[0].email,
       subject: this.locale('[{{name | safe}}] Reset Password', {
         name: SITE_NAME || 'Waline',

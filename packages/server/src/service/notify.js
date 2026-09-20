@@ -5,28 +5,15 @@ const nodemailer = require('nodemailer');
 const nunjucks = require('nunjucks');
 const mailTemplates = require('./mail-templates.js');
 const dashboardSettings = require('./dashboard-settings.js');
+const smtpSettings = require('./smtp-settings.js');
 
 module.exports = class NotifyService extends think.Service {
   constructor(controller) {
     super(controller);
 
     this.controller = controller;
-    const { SMTP_USER, SMTP_PASS, SMTP_HOST, SMTP_PORT, SMTP_SECURE, SMTP_SERVICE } = process.env;
-
-    if (SMTP_HOST || SMTP_SERVICE) {
-      const config = {
-        auth: { user: SMTP_USER, pass: SMTP_PASS },
-      };
-
-      if (SMTP_SERVICE) {
-        config.service = SMTP_SERVICE;
-      } else {
-        config.host = SMTP_HOST;
-        config.port = Math.trunc(Number(SMTP_PORT));
-        config.secure = SMTP_SECURE && SMTP_SECURE !== 'false';
-      }
-      this.transporter = nodemailer.createTransport(config);
-    }
+    const config = smtpSettings.transport();
+    if (config) this.transporter = nodemailer.createTransport(config);
   }
 
   async sleep(second) {
@@ -40,7 +27,7 @@ module.exports = class NotifyService extends think.Service {
       return;
     }
 
-    const { SITE_NAME, SITE_URL, SMTP_USER, SENDER_EMAIL, SENDER_NAME } = process.env;
+    const { SITE_NAME, SITE_URL } = process.env;
     const data = {
       self,
       parent,
@@ -63,7 +50,7 @@ module.exports = class NotifyService extends think.Service {
     }
 
     return this.transporter.sendMail({
-      from: SENDER_EMAIL && SENDER_NAME ? `"${SENDER_NAME}" <${SENDER_EMAIL}>` : SMTP_USER,
+      from: smtpSettings.from(),
       to,
       subject: title,
       html: content,
@@ -502,7 +489,8 @@ module.exports = class NotifyService extends think.Service {
   async run(comment, parent, disableAuthorNotify = false) {
     // Private conversations must not reach email templates or third-party relays.
     if (comment.visibility === 'private' || parent?.visibility === 'private') return;
-    const { AUTHOR_EMAIL, DISABLE_AUTHOR_NOTIFY } = process.env;
+    const { DISABLE_AUTHOR_NOTIFY } = process.env;
+    const AUTHOR_EMAIL = smtpSettings.read().authorEmail;
     const { mailSubject, mailTemplate, mailSubjectAdmin, mailTemplateAdmin } = think.config();
     const mailList = [];
     const isAdminComment = comment.type === 'administrator';

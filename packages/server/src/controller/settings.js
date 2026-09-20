@@ -1,6 +1,7 @@
 const Base = require('./rest.js');
 const settings = require('../service/dashboard-settings.js');
 const mail = require('../service/mail-templates.js');
+const smtp = require('../service/smtp-settings.js');
 
 module.exports = class extends Base {
   check() {
@@ -10,6 +11,9 @@ module.exports = class extends Base {
   async getAction() {
     this.check();
     switch (this.get('section')) {
+      case 'smtp': {
+        return this.success(smtp.publicSettings());
+      }
       case 'auth': {
         return this.success({
           ...settings.auth(),
@@ -33,6 +37,9 @@ module.exports = class extends Base {
   async putAction() {
     this.check();
     switch (this.get('section')) {
+      case 'smtp': {
+        return this.success(smtp.save(this.post()));
+      }
       case 'auth': {
         return this.success(settings.saveAuth(this.post(), this.ctx.state.oauthServices));
       }

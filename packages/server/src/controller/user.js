@@ -77,9 +77,9 @@ module.exports = class UserController extends BaseRest {
 
     const count = await this.modelInstance.count();
 
-    const { SMTP_HOST, SMTP_SERVICE, SENDER_EMAIL, SENDER_NAME, SMTP_USER, SITE_NAME } =
-      process.env;
-    const hasMailService = SMTP_HOST || SMTP_SERVICE;
+    const { SITE_NAME } = process.env;
+    const smtpSettings = require('../service/smtp-settings.js');
+    const hasMailService = smtpSettings.enabled();
 
     const token = Array.from({ length: 4 }, () => Math.round(Math.random() * 9)).join('');
     const normalType = hasMailService
@@ -108,7 +108,7 @@ module.exports = class UserController extends BaseRest {
       });
 
       await notify.transporter.sendMail({
-        from: SENDER_EMAIL && SENDER_NAME ? `"${SENDER_NAME}" <${SENDER_EMAIL}>` : SMTP_USER,
+        from: smtpSettings.from(),
         to: data.email,
         subject: this.locale('[{{name | safe}}] Registration Confirm Mail', {
           name: SITE_NAME || 'Waline',

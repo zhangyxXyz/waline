@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import Header from '../../components/Header.jsx';
+import SmtpSettings from '../../components/SmtpSettings.jsx';
 import { LANGUAGE_OPTIONS } from '../../locales/index.js';
 import request from '../../utils/request.js';
 
@@ -9,7 +10,7 @@ import './style.css';
 
 export default function Mail() {
   const { t, i18n } = useTranslation();
-  const [kind, setKind] = useState('reply');
+  const [kind, setKind] = useState('smtp');
   const normalizeLanguage = (value) =>
     ({ en: 'en-us', 'es-mx': 'es', 'ko-kr': 'ko', 'jp-jp': 'jp', 'vi-vn': 'vi' })[
       value.toLowerCase()
@@ -28,6 +29,8 @@ export default function Mail() {
     setData(null);
     setMessage('');
     setPreview(null);
+    setDirty(false);
+    if (kind === 'smtp') return;
     request(`settings?section=mail&language=${language}&kind=${kind}`)
       .then((value) => {
         if (active) {
@@ -101,7 +104,7 @@ export default function Mail() {
       <div className="main">
         <div className="body container">
           <nav className="waline-management-tabs">
-            {['reply', 'admin'].map((value) => (
+            {['smtp', 'reply', 'admin'].map((value) => (
               <button
                 key={value}
                 type="button"
@@ -116,105 +119,109 @@ export default function Mail() {
           <div className="typecho-page-title">
             <h2>{t('mail.title')}</h2>
           </div>
-          <section className="waline-region-settings waline-mail-editor">
-            <label>
-              {t('mail.language')}{' '}
-              <select
-                disabled={busy}
-                value={language}
-                onChange={(event) => change(setLanguage, event.target.value)}
-              >
-                {[
-                  'zh-cn',
-                  'zh-tw',
-                  'en-us',
-                  'de',
-                  'es',
-                  'fr',
-                  'id',
-                  'it',
-                  'jp',
-                  'ko',
-                  'pt-br',
-                  'ru',
-                  'vi',
-                ].map((lang) => (
-                  <option key={lang} value={lang}>
-                    {LANGUAGE_OPTIONS.find(({ value }) => normalizeLanguage(value) === lang)
-                      ?.label || lang}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <p>{t('mail.tip')}</p>
-            {data && (
-              <fieldset disabled={busy}>
-                <label>
-                  {t('mail.subject')}
-                  <input
-                    ref={subject}
-                    value={data.subject}
-                    maxLength={300}
-                    onFocus={() => {
-                      target.current = 'subject';
-                    }}
-                    onChange={(event) => edit('subject', event.target.value)}
-                  />
-                </label>
-                <label>
-                  {t('mail.body')}
-                  <textarea
-                    ref={body}
-                    rows={15}
-                    value={data.body}
-                    maxLength={100000}
-                    onFocus={() => {
-                      target.current = 'body';
-                    }}
-                    onChange={(event) => edit('body', event.target.value)}
-                  />
-                </label>
-                <p>{t('mail.variables')}</p>
-                <div className="waline-variable-tags">
-                  {variables.map((key) => (
-                    <button
-                      key={key}
-                      type="button"
-                      className="btn"
-                      title={`{{${key}}}`}
-                      onMouseDown={(event) => event.preventDefault()}
-                      onClick={() => insert(key)}
-                    >
-                      {t(`mail.${key}`)}
-                    </button>
+          {kind === 'smtp' ? (
+            <SmtpSettings onDirty={setDirty} />
+          ) : (
+            <section className="waline-region-settings waline-mail-editor">
+              <label>
+                {t('mail.language')}{' '}
+                <select
+                  disabled={busy}
+                  value={language}
+                  onChange={(event) => change(setLanguage, event.target.value)}
+                >
+                  {[
+                    'zh-cn',
+                    'zh-tw',
+                    'en-us',
+                    'de',
+                    'es',
+                    'fr',
+                    'id',
+                    'it',
+                    'jp',
+                    'ko',
+                    'pt-br',
+                    'ru',
+                    'vi',
+                  ].map((lang) => (
+                    <option key={lang} value={lang}>
+                      {LANGUAGE_OPTIONS.find(({ value }) => normalizeLanguage(value) === lang)
+                        ?.label || lang}
+                    </option>
                   ))}
-                </div>
-                <div className="waline-database-actions">
-                  <button type="button" className="btn primary" onClick={() => action('save')}>
-                    {t('settings.save')}
-                  </button>
-                  <button type="button" className="btn" onClick={() => action('preview')}>
-                    {t('mail.preview')}
-                  </button>
-                  <button type="button" className="btn" onClick={() => action('reset')}>
-                    {t('mail.reset')}
-                  </button>
-                </div>
-              </fieldset>
-            )}
-            <p role="status">{message && t(message)}</p>
-            {preview && (
-              <>
-                <h3>{preview.subject}</h3>
-                <iframe
-                  title={t('mail.preview')}
-                  sandbox=""
-                  referrerPolicy="no-referrer"
-                  srcDoc={`<!doctype html><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:; form-action 'none'; base-uri 'none'"><style>body{font-family:Arial,sans-serif;color:#222;background:white;overflow-wrap:anywhere}</style>${preview.body}`}
-                />
-              </>
-            )}
-          </section>
+                </select>
+              </label>
+              <p>{t('mail.tip')}</p>
+              {data && (
+                <fieldset disabled={busy}>
+                  <label>
+                    {t('mail.subject')}
+                    <input
+                      ref={subject}
+                      value={data.subject}
+                      maxLength={300}
+                      onFocus={() => {
+                        target.current = 'subject';
+                      }}
+                      onChange={(event) => edit('subject', event.target.value)}
+                    />
+                  </label>
+                  <label>
+                    {t('mail.body')}
+                    <textarea
+                      ref={body}
+                      rows={15}
+                      value={data.body}
+                      maxLength={100000}
+                      onFocus={() => {
+                        target.current = 'body';
+                      }}
+                      onChange={(event) => edit('body', event.target.value)}
+                    />
+                  </label>
+                  <p>{t('mail.variables')}</p>
+                  <div className="waline-variable-tags">
+                    {variables.map((key) => (
+                      <button
+                        key={key}
+                        type="button"
+                        className="btn"
+                        title={`{{${key}}}`}
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={() => insert(key)}
+                      >
+                        {t(`mail.${key}`)}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="waline-database-actions">
+                    <button type="button" className="btn primary" onClick={() => action('save')}>
+                      {t('settings.save')}
+                    </button>
+                    <button type="button" className="btn" onClick={() => action('preview')}>
+                      {t('mail.preview')}
+                    </button>
+                    <button type="button" className="btn" onClick={() => action('reset')}>
+                      {t('mail.reset')}
+                    </button>
+                  </div>
+                </fieldset>
+              )}
+              <p role="status">{message && t(message)}</p>
+              {preview && (
+                <>
+                  <h3>{preview.subject}</h3>
+                  <iframe
+                    title={t('mail.preview')}
+                    sandbox=""
+                    referrerPolicy="no-referrer"
+                    srcDoc={`<!doctype html><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:; form-action 'none'; base-uri 'none'"><style>body{font-family:Arial,sans-serif;color:#222;background:white;overflow-wrap:anywhere}</style>${preview.body}`}
+                  />
+                </>
+              )}
+            </section>
+          )}
         </div>
       </div>
     </>
