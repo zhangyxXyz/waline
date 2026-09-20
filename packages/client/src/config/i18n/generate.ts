@@ -60,5 +60,6 @@ export const generateLocale = (locale: string[]): WalineLocale =>
   ({
     privateReply: 'Private message',
     privateReplyHint: 'Visible only to both participants and administrators',
+    privateAdminHint: 'Visible only to administrators',
     ...Object.fromEntries(locale.map((item, index) => [localeKeys[index], item])),
   }) as unknown as WalineLocale;

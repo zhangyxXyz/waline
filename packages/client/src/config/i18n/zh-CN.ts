@@ -58,4 +58,5 @@ export default {
   ]),
   privateReply: '私密留言',
   privateReplyHint: '仅双方账户及管理员可见',
+  privateAdminHint: '仅管理员可见',
 };

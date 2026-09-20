@@ -3,7 +3,9 @@ const active = (user) => Boolean(user?.objectId) && ['guest', 'administrator'].i
 const same = (a, b) => a != null && b != null && String(a) === String(b);
 const participant = (user, comment) =>
   active(user) &&
-  [comment.private_user_a, comment.private_user_b].some((id) => same(id, user.objectId));
+  (comment.private_user_a == null && comment.private_user_b == null
+    ? user.type === 'administrator'
+    : [comment.private_user_a, comment.private_user_b].some((id) => same(id, user.objectId)));
 const isPrivate = (comment) => comment?.visibility === 'private';
 const canRead = (user, comment) =>
   !isPrivate(comment) ||
@@ -36,6 +38,10 @@ const createAudience = (user, input, { parent, root, owner }) => {
   }
   if (!input.pid && input.visibility === 'private') {
     if (!active(user)) throw error('Login required', 401);
+    // No account audience: access follows the administrator role, including after demotion.
+    if (user.type === 'administrator') {
+      return { visibility: 'private', private_user_a: null, private_user_b: null };
+    }
     if (!active(owner) || owner.type !== 'administrator' || same(owner.objectId, user.objectId)) {
       throw error('A private message requires a distinct site administrator');
     }

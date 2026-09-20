@@ -414,7 +414,7 @@ describe('private reply access', () => {
     [1, { pid: 1, url: '/wrong' }],
     [1, { user_id: 2 }],
     [1, { private_user_a: 3 }],
-    [4, { pid: undefined, rid: undefined }],
+    [4, { pid: 3, rid: 3, url: '/anon' }],
     [undefined, { pid: undefined, rid: undefined }],
     [5, { pid: undefined, rid: undefined }],
   ])('rejects invalid private creation %#', async (id, extra) => {
@@ -422,6 +422,86 @@ describe('private reply access', () => {
     expect([400, 401, 403, 404]).toContain(result.errno);
     expect(db.prepare('SELECT COUNT(*) AS n FROM Comment').get().n).toBe(3);
   });
+
+  it('creates administrator-only roots without a recipient and preserves that scope in replies', async () => {
+    db.exec(
+      "INSERT INTO Users (id,display_name,email,type) VALUES (6,'other admin','admin6@test.invalid','administrator')",
+    );
+    const result = await post(4, { pid: undefined, rid: undefined, comment: 'ADMIN_ONLY_ROOT' });
+    expect(result.errno).toBe(0);
+    const rootId = result.data.objectId;
+    const row = db.prepare('SELECT * FROM Comment WHERE id=?').get(rootId);
+    expect(row.visibility).toBe('private');
+    expect(row.private_user_a).toBeNull();
+    expect(row.private_user_b).toBeNull();
+    for (const id of [4, 6]) {
+      const list = await json('/api/comment?path=/post', id);
+      const root = list.data.data.find((comment) => comment.objectId === rootId);
+      expect(root.canReply).toBe(true);
+      expect(root.canPrivateReply).toBe(true);
+    }
+    const reply = await post(6, {
+      pid: rootId,
+      rid: rootId,
+      visibility: undefined,
+      comment: 'ADMIN_ONLY_REPLY',
+    });
+    expect(reply.errno).toBe(0);
+    expect(reply.data.visibility).toBe('private');
+    expect((await post(4, { pid: rootId, rid: rootId, visibility: 'public' })).errno).not.toBe(0);
+    // Losing the role must also revoke access for the original author.
+    db.exec("UPDATE Users SET type='guest' WHERE id=4");
+    for (const id of [undefined, 1, 2, 3, 4, 5]) {
+      const list = await json('/api/comment?path=/post', id);
+      expect(JSON.stringify(list)).not.toContain('ADMIN_ONLY_');
+      expect(list.data.count).toBe([1, 2].includes(id) ? 2 : 1);
+      expect(JSON.stringify(await json('/api/comment?type=recent', id))).not.toContain(
+        'ADMIN_ONLY_',
+      );
+      expect((await post(id, { pid: rootId, rid: rootId })).errno).not.toBe(0);
+      expect(
+        (await json(`/api/comment/${rootId}`, id, 'PUT', { comment: 'changed' })).errno,
+      ).not.toBe(0);
+    }
+    await expect((await request('/api/comment/rss?path=/post', 6)).text()).resolves.not.toContain(
+      'ADMIN_ONLY_',
+    );
+    expect(sideEffect).not.toHaveBeenCalled();
+    expect(notifyRun).not.toHaveBeenCalled();
+  });
+
+  it.each(['approved', 'waiting', 'spam'])(
+    'lets administrators privately reply to an account-owned %s comment',
+    async (status) => {
+      db.prepare('UPDATE Comment SET status=? WHERE id=1').run(status);
+      const list = await json('/api/comment?type=list', 4);
+      expect(list.data.data.find((comment) => Number(comment.objectId) === 1).canPrivateReply).toBe(
+        true,
+      );
+      const result = await post(4, { comment: 'ADMIN_TO_USER' });
+      expect(result.errno).toBe(0);
+      const row = db.prepare('SELECT * FROM Comment WHERE id=?').get(result.data.objectId);
+      expect([row.private_user_a, row.private_user_b]).toStrictEqual([4, 2]);
+      // The original comment may be moderated; verify the complete conversation once approved.
+      db.prepare("UPDATE Comment SET status='approved' WHERE id=1").run();
+      for (const id of [2, 4]) {
+        expect(JSON.stringify(await json('/api/comment?path=/post', id))).toContain(
+          'ADMIN_TO_USER',
+        );
+      }
+      for (const id of [undefined, 1, 3]) {
+        expect(JSON.stringify(await json('/api/comment?path=/post', id))).not.toContain(
+          'ADMIN_TO_USER',
+        );
+      }
+      // Keep the in-memory SQL date representation out of the rate-limit comparison.
+      db.exec("UPDATE Comment SET insertedAt='2026-01-01'");
+      expect(
+        (await post(2, { pid: result.data.objectId, rid: 1, visibility: undefined })).errno,
+      ).toBe(0);
+      expect(notifyRun).not.toHaveBeenCalled();
+    },
+  );
 
   it('creates a private root addressed to the administrator and preserves its audience', async () => {
     const result = await post(1, { pid: undefined, rid: undefined });

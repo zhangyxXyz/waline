@@ -249,6 +249,7 @@ jobs:
           This version tag is intentionally reused for this update. Pin the client SHA-256 and image digest to identify the exact build.
 
           ### Features
+          - Administrators can create administrator-only private roots and privately reply to account-owned comments. Private root replies retain administrator-only access, including after the original author loses the role.
           - Image upload dashboard switch controls the matching client's button, paste and drag-and-drop tools; manual image URLs and existing images remain unaffected.
           - SMTP settings precede mail templates, support environment defaults and custom TLS settings, and never return saved passwords to the browser.
           - Top-level private messages now include the private visibility flag when submitted, just like private replies.

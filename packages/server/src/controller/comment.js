@@ -240,7 +240,11 @@ module.exports = class CommentController extends BaseRest {
       [rootTarget] = await this.modelInstance.select({ objectId: rid });
     }
     let owner;
-    if (!pid && input.visibility === 'private') {
+    if (
+      !pid &&
+      input.visibility === 'private' &&
+      this.ctx.state.userInfo?.type !== 'administrator'
+    ) {
       const owners = await this.getModel('Users').select({ type: 'administrator' });
       owner = process.env.PRIVATE_MESSAGE_ADMIN_ID
         ? owners.find((account) => same(account.objectId, process.env.PRIVATE_MESSAGE_ADMIN_ID))
@@ -257,12 +261,14 @@ module.exports = class CommentController extends BaseRest {
       if (this.config('storage') !== 'mysql') {
         return this.ctx.throw(400, 'Private replies require MySQL');
       }
-      const ids = [audience.private_user_a, audience.private_user_b];
-      const accounts = await this.getModel('Users').select({
-        objectId: ['IN', ids],
-        type: ['IN', ['guest', 'administrator']],
-      });
-      if (accounts.length !== 2) {
+      const ids = [audience.private_user_a, audience.private_user_b].filter((id) => id != null);
+      const accounts = ids.length
+        ? await this.getModel('Users').select({
+            objectId: ['IN', ids],
+            type: ['IN', ['guest', 'administrator']],
+          })
+        : [];
+      if (accounts.length !== ids.length) {
         return this.ctx.throw(400, 'Both participants need active accounts');
       }
     }

@@ -1,6 +1,6 @@
 import { generateLocale } from './generate.js';
 
-export default generateLocale([
+const locale = generateLocale([
   '暱稱',
   '暱稱不能少於3個字元',
   '郵箱',
@@ -55,3 +55,10 @@ export default generateLocale([
   '訂閱本站的評論',
   '訂閱您的評論回覆',
 ]);
+
+export default {
+  ...locale,
+  privateReply: '私密留言',
+  privateReplyHint: '僅雙方帳戶及管理員可見',
+  privateAdminHint: '僅管理員可見',
+};

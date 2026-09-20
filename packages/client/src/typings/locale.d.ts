@@ -24,6 +24,7 @@ export interface WalineReactionLocale {
 export interface WalineLocale extends WalineDateLocale, WalineLevelLocale, WalineReactionLocale {
   privateReply: string;
   privateReplyHint: string;
+  privateAdminHint: string;
   nick: string;
   mail: string;
   link: string;

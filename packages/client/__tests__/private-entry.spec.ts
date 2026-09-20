@@ -24,7 +24,11 @@ const renderControl = (overrides = {}) =>
         userInfo: { token: 'test-session', type: 'guest' },
         privateChoice: false,
         privateReply: false,
-        locale: { privateReply: 'Private message', privateReplyHint: 'Participants only' },
+        locale: {
+          privateReply: 'Private message',
+          privateReplyHint: 'Participants only',
+          privateAdminHint: 'Administrators only',
+        },
         ...overrides,
       }),
     }),
@@ -65,13 +69,20 @@ describe('private comment entry', () => {
     await expect(renderControl()).resolves.toContain('type="checkbox"');
   });
 
-  it('hides the control before login and for an administrator messaging themself', async () => {
-    for (const userInfo of [
-      { token: '', type: 'guest' },
-      { token: 'admin', type: 'administrator' },
-    ]) {
-      await expect(renderControl({ userInfo })).resolves.not.toContain('type="checkbox"');
-    }
+  it('hides the control before login', async () => {
+    await expect(renderControl({ userInfo: { token: '', type: 'guest' } })).resolves.not.toContain(
+      'type="checkbox"',
+    );
+  });
+
+  it('offers administrators a private root and private replies to account-owned comments', async () => {
+    const userInfo = { token: 'admin', type: 'administrator' };
+    const root = await renderControl({ userInfo });
+    expect(root).toContain('type="checkbox"');
+    expect(root).toContain('Administrators only');
+    const reply = await renderControl({ userInfo, replyId: 1, canPrivateReply: true });
+    expect(reply).toContain('type="checkbox"');
+    expect(reply).toContain('Participants only');
   });
 
   it('requires server permission when replying to an existing comment', async () => {
