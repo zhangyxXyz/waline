@@ -1,4 +1,5 @@
 const RSS = require('rss');
+const dashboard = require('../../service/dashboard-settings.js');
 const BaseRest = require('../rest.js');
 const { getMarkdownParser } = require('../../service/markdown/index.js');
 const { think } = require('thinkjs');
@@ -54,6 +55,14 @@ module.exports = class extends BaseRest {
   }
 
   async getAction() {
+    this.ctx.set('Cache-Control', 'private, no-store');
+    if (!dashboard.allowed(this.ctx.state.userInfo)) {
+      setRssResponse(
+        this.ctx,
+        buildRssXml({ title: 'Comments', link: process.env.SITE_URL, description: '', items: [] }),
+      );
+      return;
+    }
     const { path, email, user_id: userId, count } = this.get();
     const limit = Number.isFinite(Number(count)) ? Number(count) : 20;
     const safeLimit = Math.min(Math.max(limit, 1), 50);

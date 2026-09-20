@@ -16,6 +16,8 @@ process.env.JWT_TOKEN = 'private-reply-test-secret';
 process.env.IPQPS = '0';
 const regionDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'waline-region-test-'));
 process.env.REGION_SETTINGS_FILE = path.join(regionDirectory, 'settings.json');
+process.env.DASHBOARD_SETTINGS_FILE = path.join(regionDirectory, 'dashboard.json');
+const dashboard = require('../src/service/dashboard-settings.js');
 const main = require('../index.js');
 const jwt = require('jsonwebtoken');
 const { Parser } = require('think-model-mysql');
@@ -169,6 +171,7 @@ describe('private reply access', () => {
     ({ port } = server.address());
   });
   beforeEach(() => {
+    dashboard.saveComments({ enabled: true, allowAdmin: false });
     db.exec('DELETE FROM Comment; DELETE FROM Users;');
     for (const [id, type] of [
       [1, 'guest'],
@@ -294,6 +297,29 @@ describe('private reply access', () => {
     const response = await request('/api/comment/rss?path=/post', id);
     expect(response.status).toBe(200);
     await expect(response.text()).resolves.not.toContain('PRIVATE_SENTINEL');
+  });
+
+  it('closes all public comment reads while retaining admin maintenance and optional access', async () => {
+    dashboard.saveComments({ enabled: false, allowAdmin: false });
+    for (const id of [undefined, 1, 4]) {
+      const list = await json('/api/comment?path=/post', id);
+      expect(list.data.data).toStrictEqual([]);
+      expect(list.data.count).toBe(0);
+      expect(list.data.closed).toBe(true);
+      expect((await json('/api/comment?type=recent', id)).data).toStrictEqual([]);
+      expect((await json('/api/comment?type=count&url=/post', id)).data).toStrictEqual([0]);
+      await expect((await request('/api/comment/rss', id)).text()).resolves.not.toContain('<item>');
+      expect(
+        (await request('/api/comment', id, 'POST', { url: '/post', comment: 'blocked' })).status,
+      ).toBe(403);
+    }
+    expect((await json('/api/comment?type=list', 4)).data.data.length).toBeGreaterThan(0);
+    expect((await request('/api/settings?section=comments')).status).toBe(401);
+    expect((await request('/api/settings?section=comments', 1)).status).toBe(403);
+    expect((await json('/api/settings?section=comments', 4)).data.enabled).toBe(false);
+    dashboard.saveComments({ enabled: false, allowAdmin: true });
+    expect((await json('/api/comment?path=/post', 4)).data.data.length).toBeGreaterThan(0);
+    expect((await json('/api/comment?path=/post', 1)).data.data).toStrictEqual([]);
   });
 
   it('restricts region auditing and raw IP to administrators', async () => {

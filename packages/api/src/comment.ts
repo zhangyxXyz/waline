@@ -47,6 +47,8 @@ export interface GetCommentOptions extends BaseAPIOptions {
 }
 
 export interface GetCommentResponse {
+  /** Whether the server has closed the public comment service. */
+  closed?: boolean;
   /**
    * 评论数量
    *

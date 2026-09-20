@@ -31,6 +31,12 @@ module.exports = class UserLogic extends Base {
   }
 
   async postAction() {
+    this.rules = {
+      email: { email: true, required: true },
+      password: { string: true, required: true, length: { min: 8, max: 200 } },
+      display_name: { string: true, required: true, length: { min: 2, max: 100 } },
+      url: { string: true, length: { max: 2000 } },
+    };
     return this.useCaptchaCheck();
   }
 

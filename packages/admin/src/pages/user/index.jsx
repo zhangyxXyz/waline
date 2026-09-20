@@ -7,12 +7,14 @@ import Header from '../../components/Header.jsx';
 // oxlint-disable-next-line import/no-namespace
 import * as Icons from '../../components/icon';
 import Paginator from '../../components/Paginator.jsx';
+import ServiceSettings from '../../components/ServiceSettings.jsx';
 import { getUserList, updateUser, deleteUser } from '../../services/user.js';
 import { buildAvatar } from '../manage-comments/utils.js';
 
 export default function User() {
   const currentUser = useSelector((state) => state.user);
   const { t } = useTranslation();
+  const [panel, setPanel] = useState('users');
   const [list, setList] = useState({
     page: 1,
     totalPages: 0,
@@ -118,10 +120,23 @@ export default function User() {
       <Header />
       <div className="main">
         <div className="body container">
+          <nav className="waline-management-tabs">
+            <button
+              type="button"
+              aria-pressed={panel === 'users'}
+              onClick={() => setPanel('users')}
+            >
+              {t('manage users')}
+            </button>
+            <button type="button" aria-pressed={panel === 'auth'} onClick={() => setPanel('auth')}>
+              {t('settings.auth')}
+            </button>
+          </nav>
           <div className="typecho-page-title">
-            <h2>{t('manage users')}</h2>
+            <h2>{t(panel === 'auth' ? 'settings.auth' : 'manage users')}</h2>
           </div>
-          <main className="row typecho-page-main">
+          {panel === 'auth' && <ServiceSettings section="auth" />}
+          <main className="row typecho-page-main" hidden={panel !== 'users'}>
             <div className="col-mb-12 typecho-list">
               <form method="post" name="manage_comments" className="operate-form">
                 <div className="typecho-table-wrap">

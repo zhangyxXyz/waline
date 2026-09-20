@@ -1,4 +1,5 @@
 const BaseRest = require('./rest.js');
+const dashboard = require('../service/dashboard-settings.js');
 
 module.exports = class UserController extends BaseRest {
   constructor(...args) {
@@ -11,6 +12,7 @@ module.exports = class UserController extends BaseRest {
     const { userInfo } = this.ctx.state;
 
     if (think.isEmpty(userInfo) || userInfo.type !== 'administrator') {
+      if (!dashboard.allowed(userInfo)) return this.success([]);
       const users = await this.getUsersListByCount();
 
       return this.success(users);
@@ -60,7 +62,10 @@ module.exports = class UserController extends BaseRest {
   }
 
   async postAction() {
-    const data = this.post();
+    const registration = dashboard.auth();
+    if (!registration.registration || !registration.email)
+      {return this.ctx.throw(403, this.locale('Registration is closed'));}
+    const data = this.post('display_name,email,url,password');
     const resp = await this.modelInstance.select({
       email: data.email,
     });
@@ -180,6 +185,8 @@ module.exports = class UserController extends BaseRest {
       const nextSocial = this.post(social);
 
       if (think.isString(nextSocial)) {
+        // Only OAuth may create a binding. Profile updates may remove one.
+        if (nextSocial !== '') return this.ctx.throw(403);
         updateData[social] = nextSocial;
       }
     });

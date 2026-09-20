@@ -25,6 +25,7 @@ const likeStorage = useLikeStorage();
 const status = ref<'loading' | 'success' | 'error'>('loading');
 
 const count = ref(0);
+const serviceClosed = ref(false);
 const page = ref(1);
 const totalPages = ref(0);
 
@@ -66,6 +67,12 @@ const getCommentData = (pageNumber: number): void => {
       if (controller.signal.aborted) return;
       status.value = 'success';
       count.value = resp.count;
+      serviceClosed.value = Boolean(resp.closed);
+      if (serviceClosed.value) {
+        data.value = [];
+        reply.value = null;
+        edit.value = null;
+      }
       data.value.push(...resp.data);
       page.value = pageNumber;
       totalPages.value = resp.totalPages;
@@ -287,7 +294,11 @@ onUnmounted(() => {
   <div data-waline>
     <ArticleReaction />
 
-    <CommentBox v-if="!reply && !edit" @log="refreshComments" @submit="onSubmit" />
+    <CommentBox
+      v-if="!serviceClosed && !reply && !edit"
+      @log="refreshComments"
+      @submit="onSubmit"
+    />
 
     <div class="wl-meta-head">
       <div class="wl-count">

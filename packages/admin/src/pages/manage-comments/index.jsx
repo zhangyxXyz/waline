@@ -4,10 +4,11 @@ import { Trans, useTranslation } from 'react-i18next';
 import { useSelector } from 'react-redux';
 
 import Header from '../../components/Header.jsx';
-import Paginator from '../../components/Paginator.jsx';
-import RegionSettings from '../../components/RegionSettings.jsx';
-import RegionDatabase from '../../components/RegionDatabase.jsx';
 import LevelSettings from '../../components/LevelSettings.jsx';
+import Paginator from '../../components/Paginator.jsx';
+import RegionDatabase from '../../components/RegionDatabase.jsx';
+import RegionSettings from '../../components/RegionSettings.jsx';
+import ServiceSettings from '../../components/ServiceSettings.jsx';
 import {
   auditCommentRegions,
   deleteComment,
@@ -301,7 +302,11 @@ export default function ManageComments() {
       {regionReport && (
         <div className="waline-audit-toast">
           <output aria-live="polite">{t(regionReport.key, regionReport.values)}</output>
-          <button type="button" aria-label={t('management.close')} onClick={() => setRegionReport(null)}>
+          <button
+            type="button"
+            aria-label={t('management.close')}
+            onClick={() => setRegionReport(null)}
+          >
             ×
           </button>
         </div>
@@ -310,6 +315,13 @@ export default function ManageComments() {
         <div className="body container">
           {user?.type === 'administrator' && (
             <nav className="waline-management-tabs" aria-label={t('management.tabs')}>
+              <button
+                type="button"
+                aria-pressed={activePanel === 'service'}
+                onClick={() => setActivePanel('service')}
+              >
+                {t('settings.comments')}
+              </button>
               <button
                 type="button"
                 aria-pressed={activePanel === 'comments'}
@@ -324,17 +336,38 @@ export default function ManageComments() {
               >
                 {t('region.title')}
               </button>
-              <button type="button" aria-pressed={activePanel === 'levels'} onClick={() => setActivePanel('levels')}>
+              <button
+                type="button"
+                aria-pressed={activePanel === 'levels'}
+                onClick={() => setActivePanel('levels')}
+              >
                 {t('levels.title')}
               </button>
             </nav>
           )}
           <div className="typecho-page-title waline-comments-title">
-            <h2>{t(activePanel === 'ip' ? 'region.title' : activePanel === 'levels' ? 'levels.title' : 'manage comments')}</h2>
+            <h2>
+              {t(
+                activePanel === 'service'
+                  ? 'settings.comments'
+                  : activePanel === 'ip'
+                    ? 'region.title'
+                    : activePanel === 'levels'
+                      ? 'levels.title'
+                      : 'manage comments',
+              )}
+            </h2>
           </div>
           <main className="row typecho-page-main">
+            {user?.type === 'administrator' && activePanel === 'service' && (
+              <div className="waline-ip-panel">
+                <ServiceSettings section="comments" />
+              </div>
+            )}
             {user?.type === 'administrator' && activePanel === 'levels' && (
-              <div className="waline-ip-panel"><LevelSettings /></div>
+              <div className="waline-ip-panel">
+                <LevelSettings />
+              </div>
             )}
             {user?.type === 'administrator' && activePanel === 'ip' && (
               <div className="waline-ip-panel">

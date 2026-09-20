@@ -1,4 +1,7 @@
 {
+  "Comments are closed": "评论已关闭",
+  "Registration is closed": "本站暂不开放注册",
+  "This sign-in method is disabled": "此登录方式已停用",
   "import data format not support!": "文件格式不支持",
   "USER_EXIST": "用户已存在",
   "USER_NOT_EXIST": "用户不存在",

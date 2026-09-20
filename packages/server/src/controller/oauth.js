@@ -1,4 +1,5 @@
 const jwt = require('jsonwebtoken');
+const dashboard = require('../service/dashboard-settings.js');
 
 module.exports = class OAuthController extends think.Controller {
   constructor(ctx) {
@@ -9,6 +10,15 @@ module.exports = class OAuthController extends think.Controller {
   async indexAction() {
     const { code, state, type, redirect } = this.get();
     const { oauthUrl } = this.config();
+    const current = this.ctx.state.userInfo;
+    const binding = Boolean(current?.objectId);
+    if (
+      !this.ctx.state.oauthServices.some((service) => service.name === type) ||
+      !/^[a-z][a-z0-9_-]*$/u.test(type || '') ||
+      !dashboard.provider(type, binding ? 'bind' : 'login')
+    ) {
+      return this.ctx.throw(403, this.locale('This sign-in method is disabled'));
+    }
 
     if (!code) {
       const { serverURL } = this.ctx;
@@ -58,6 +68,9 @@ module.exports = class OAuthController extends think.Controller {
     // when the social account has been linked, then redirect to this linked account profile page. It may be current account or another.
     // If it's another account, user should unlink the social type in that account and then link it.
     if (!think.isEmpty(userBySocial)) {
+      if (userBySocial[0].type === 'banned') return this.ctx.throw(403);
+      if (binding && String(current.objectId) !== String(userBySocial[0].objectId))
+        {return this.ctx.throw(409);}
       const token = jwt.sign(userBySocial[0].objectId, this.config('jwtKey'));
 
       if (redirect) {
@@ -67,8 +80,6 @@ module.exports = class OAuthController extends think.Controller {
 
       return this.success();
     }
-
-    const current = this.ctx.state.userInfo;
 
     // when login user link social type, then update data
     if (!think.isEmpty(current)) {
@@ -87,6 +98,8 @@ module.exports = class OAuthController extends think.Controller {
     }
 
     // when user has not login, then we create account by the social type!
+    if (!dashboard.auth().registration)
+      {return this.ctx.throw(403, this.locale('Registration is closed'));}
     const count = await this.modelInstance.count();
     const data = {
       display_name: user.name,

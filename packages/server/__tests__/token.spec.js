@@ -93,7 +93,9 @@ describe('token API', () => {
   beforeAll(async () => {
     vi.stubGlobal('fetch', (url, options) => {
       if (typeof url === 'string' && url.startsWith(oauthUrl)) {
-        return Promise.resolve({ json: () => Promise.resolve({ services: [] }) });
+        return Promise.resolve({
+          json: () => Promise.resolve({ services: [{ name: 'github', origin: 'github.com' }] }),
+        });
       }
 
       return originalFetch(url, options);

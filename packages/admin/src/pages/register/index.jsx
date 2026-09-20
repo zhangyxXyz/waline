@@ -5,6 +5,7 @@ import { Link, useNavigate } from 'react-router';
 
 import Header from '../../components/Header.jsx';
 import { useCaptcha } from '../../components/useCaptcha.js';
+import { emailRegistration } from '../../utils/auth-settings.js';
 
 const SEP = ' • ';
 
@@ -73,6 +74,25 @@ export default function Register() {
       setSubmitting(false);
     }
   };
+
+  if (!emailRegistration())
+    return (
+      <>
+        <Header />
+        <div className="typecho-login-wrap">
+          <div className="typecho-login">
+            <p>
+              {t(
+                window.authSettings?.registration === false
+                  ? 'settings.registrationClosed'
+                  : 'settings.emailClosed',
+              )}
+            </p>
+            <Link to="/ui/login">{t('login')}</Link>
+          </div>
+        </div>
+      </>
+    );
 
   return (
     <>

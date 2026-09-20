@@ -23,6 +23,9 @@ module.exports = class CommentLogic extends Base {
     }
 
     switch (type) {
+      case 'service-status': {
+        return;
+      }
       case 'level-settings':
       case 'region-database':
       case 'region-settings': {

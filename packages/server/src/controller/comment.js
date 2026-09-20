@@ -2,6 +2,7 @@ const BaseRest = require('./rest.js');
 const levelSettings = require('../service/level-settings.js');
 const regionSettings = require('../service/region-settings.js');
 const regionDatabase = require('../service/region-database.js');
+const dashboard = require('../service/dashboard-settings.js');
 
 const currentRegionSettings = () =>
   regionSettings.read({
@@ -111,6 +112,9 @@ module.exports = class CommentController extends BaseRest {
   }
 
   async getAction() {
+    this.ctx.set('Cache-Control', 'private, no-store');
+    if (this.get('type') === 'service-status')
+      {return this.success({ enabled: dashboard.allowed(this.ctx.state.userInfo) });}
     if (this.get('type') === 'level-settings') {
       if (this.ctx.state.userInfo?.type !== 'administrator') return this.ctx.throw(403);
       this.ctx.set('Cache-Control', 'private, no-store');
@@ -128,6 +132,28 @@ module.exports = class CommentController extends BaseRest {
     }
     this.ctx.set('Cache-Control', 'private, no-store');
     const { type } = this.get();
+
+    if (!['list', 'region-audit'].includes(type) && !dashboard.allowed(this.ctx.state.userInfo)) {
+      const urls = this.get('url');
+      const data =
+        type === 'count'
+          ? Array.isArray(urls) && urls.length
+            ? this.ctx.state.deprecated && urls.length === 1
+              ? 0
+              : urls.map(() => 0)
+            : 0
+          : type === 'recent'
+            ? []
+            : {
+                page: Number(this.get('page')) || 1,
+                pageSize: Number(this.get('pageSize')) || 10,
+                totalPages: 0,
+                count: 0,
+                data: [],
+                closed: true,
+              };
+      return this.jsonOrSuccess(data);
+    }
 
     const fnMap = {
       recent: this['getRecentCommentList'],
@@ -177,6 +203,8 @@ module.exports = class CommentController extends BaseRest {
       if (this.ctx.state.userInfo?.type !== 'administrator') return this.ctx.throw(403);
       return this.success(regionDatabase.startUpdate());
     }
+    if (!dashboard.allowed(this.ctx.state.userInfo))
+      {return this.ctx.throw(403, this.locale('Comments are closed'));}
     think.logger.debug('Post Comment Start!');
 
     const { comment, link, mail, nick, pid, rid, ua, url, at } = this.post();
@@ -414,6 +442,8 @@ module.exports = class CommentController extends BaseRest {
       return this.success(regionSettings.write(this.post()));
     }
     const { userInfo } = this.ctx.state;
+    if (userInfo?.type !== 'administrator' && !dashboard.allowed(userInfo))
+      {return this.ctx.throw(403, this.locale('Comments are closed'));}
     const isAdmin = userInfo.type === 'administrator';
     // Ownership, audience and topology are immutable even for administrators.
     const data = isAdmin

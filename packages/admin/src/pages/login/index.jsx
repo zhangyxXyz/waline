@@ -8,6 +8,7 @@ import Header from '../../components/Header.jsx';
 import * as Icons from '../../components/icon';
 import { useCaptcha } from '../../components/useCaptcha.js';
 import { get2FAToken } from '../../services/user.js';
+import { emailRegistration, providerAllowed } from '../../utils/auth-settings.js';
 
 export default function Login() {
   const { t } = useTranslation();
@@ -199,22 +200,28 @@ export default function Login() {
             </p>
           </form>
           <div className="social-accounts">
-            {socials.map((social) => {
-              // oxlint-disable-next-line import/namespace
-              const Icon = Icons[social];
+            {socials
+              .filter((social) => providerAllowed(social, 'login'))
+              .map((social) => {
+                // oxlint-disable-next-line import/namespace
+                const Icon = Icons[social];
 
-              return (
-                <a key={social} href={buildOAuthURL(social)}>
-                  {Icon ? <Icon className="social-icon" aria-hidden="true" /> : null}
-                </a>
-              );
-            })}
+                return (
+                  <a key={social} href={buildOAuthURL(social)}>
+                    {Icon ? <Icon className="social-icon" aria-hidden="true" /> : null}
+                  </a>
+                );
+              })}
           </div>
 
           <p className="more-link">
             <Link to="/ui">{t('back to home')}</Link>
-            {' • '}
-            <Link to="/ui/register">{t('register')}</Link>
+            {emailRegistration() && (
+              <>
+                {' • '}
+                <Link to="/ui/register">{t('register')}</Link>
+              </>
+            )}
           </p>
         </div>
       </div>
