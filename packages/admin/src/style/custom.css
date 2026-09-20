@@ -316,27 +316,28 @@ body.waline-body {
 }
 
 .typecho-page-title {
-  margin-bottom: 22px;
+  margin-bottom: 18px;
 }
 
 .typecho-page-title h2 {
   margin: 0;
   color: var(--wa-text);
-  font-size: 2rem;
+  font-size: 1.4rem;
   font-weight: 700;
+  line-height: 1.4;
   letter-spacing: -0.02em;
 }
 
 .typecho-page-title.waline-comments-title h2 {
-  font-size: 1.7rem;
+  font-size: 1.4rem;
 }
 
 .typecho-page-title::after {
   content: '';
   display: block;
-  width: 64px;
-  height: 4px;
-  margin-top: 14px;
+  width: 48px;
+  height: 3px;
+  margin-top: 10px;
   border-radius: 999px;
   background: linear-gradient(90deg, #0f6bff, #6fc0ff);
 }
@@ -748,11 +749,11 @@ button.operate-button-delete:hover {
   }
 
   .typecho-page-title h2 {
-    font-size: 1.6rem;
+    font-size: 1.25rem;
   }
 
   .typecho-page-title.waline-comments-title h2 {
-    font-size: 1.4rem;
+    font-size: 1.25rem;
   }
 
   .typecho-list-operate form,
@@ -1064,11 +1065,11 @@ button.operate-reply {
 
 /* Region audit feedback stays out of the page layout. */
 .waline-comments-title {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
+  display: block;
+}
+.waline-setting-check {
+  display: block;
+  margin: 16px 0;
 }
 .waline-region-audit {
   flex-shrink: 0;
