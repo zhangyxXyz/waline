@@ -4,7 +4,7 @@ WORKDIR /source
 RUN npm install --global pnpm@12.3.1
 COPY . .
 RUN pnpm install --frozen-lockfile --store-dir /pnpm/store
-RUN node --test scripts/tests/region-database.checks.cjs scripts/tests/level-settings.checks.cjs && pnpm exec vitest run && pnpm run build
+RUN node --test scripts/tests/*.checks.cjs && pnpm exec vitest run && pnpm run build
 RUN pnpm --filter @waline/vercel deploy --prod --store-dir /pnpm/store /runtime
 RUN mkdir -p /runtime/public/fork && \
     cp packages/admin/dist/admin.js /runtime/public/fork/admin.js && \

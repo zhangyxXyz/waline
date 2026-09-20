@@ -41,7 +41,8 @@ const onlyBundle = [
   '@vue/runtime-dom',
   '@vue/shared',
   '@vueuse/shared',
-  ...alwaysBundle,
+  // Workspace sources are bundled through alwaysBundle, not treated as node_modules dependencies.
+  ...alwaysBundle.filter((name) => name !== '@waline/api'),
 ];
 
 const commonOptions: UserConfig = {
