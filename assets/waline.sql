@@ -27,7 +27,7 @@ CREATE TABLE `wl_Comment` (
   `nick` varchar(255) DEFAULT NULL,
   `pid` int(11) DEFAULT NULL,
   `rid` int(11) DEFAULT NULL,
-  `sticky` boolean DEFAULT NULL,
+  `sticky` boolean DEFAULT 0,
   `status` varchar(50) NOT NULL DEFAULT '',
   `like` int(11) DEFAULT NULL,
   `ua` text,
