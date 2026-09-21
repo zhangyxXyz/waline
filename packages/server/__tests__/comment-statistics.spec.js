@@ -8,6 +8,7 @@ const {
   commentList,
   authorKey,
   authorWhere,
+  withAvatars,
 } = require('../src/service/comment-statistics.js');
 const publicComment = {
   visibility: 'public',
@@ -20,6 +21,36 @@ const publicComment = {
 const now = new Date('2026-03-15T00:00:00Z');
 
 describe('public comment statistics', () => {
+  it('adds public avatars without leaking account details or hydrating private rows', async () => {
+    const rows = [
+      { ...publicComment, objectId: 1, user_id: 7 },
+      { ...publicComment, objectId: 2 },
+      { ...publicComment, objectId: 3, visibility: 'private' },
+    ];
+    const avatar = vi.fn(async () => 'https://avatar.test/guest.png');
+    const result = await withAvatars(
+      commentList(rows, {}),
+      rows,
+      [
+        {
+          objectId: 7,
+          avatar: 'https://avatar.test/member.png',
+          email: 'secret@test',
+          display_name: 'Member',
+        },
+      ],
+      avatar,
+      'https://proxy.test/avatar',
+    );
+    expect(result.items).toHaveLength(2);
+    expect(result.items[0].avatar).toBe(
+      'https://proxy.test/avatar?url=https%3A%2F%2Favatar.test%2Fguest.png',
+    );
+    expect(result.items[1].avatar).toContain('member.png');
+    expect(avatar).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(result)).not.toMatch(/secret|mail|user_id|192\.0\.2/u);
+  });
+
   it('authenticates opaque contributor tokens and builds server-side filters', () => {
     expect(authorWhere(authorKey({ ...publicComment, user_id: 12 }))).toStrictEqual({
       user_id: '12',

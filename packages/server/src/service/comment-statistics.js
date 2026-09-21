@@ -132,4 +132,32 @@ const aggregateComments = async (rows, resolveRegion, settings, now = new Date()
     regions: { china: points(china), world: points(world) },
   };
 };
-module.exports = { aggregateComments, commentList, authorKey, authorWhere };
+// Enrich only the already-filtered public page; never serialize mail or account IDs.
+const withAvatars = async (result, rows, users, resolveAvatar, proxy) => {
+  const comments = new Map(rows.map((row) => [String(row.objectId), row]));
+  const accounts = new Map(users.map((user) => [String(user.objectId), user]));
+  return {
+    ...result,
+    items: await Promise.all(
+      result.items.map(async (item) => {
+        const row = comments.get(item.id);
+        if (!row) return item;
+        const user = accounts.get(String(row.user_id));
+        const avatar =
+          user?.avatar ||
+          (await resolveAvatar({
+            nick: user?.display_name || row.nick || '',
+            mail: user?.email || row.mail || '',
+          }));
+        return {
+          ...item,
+          avatar:
+            proxy && avatar && !avatar.includes(proxy)
+              ? `${proxy}?url=${encodeURIComponent(avatar)}`
+              : avatar,
+        };
+      }),
+    ),
+  };
+};
+module.exports = { aggregateComments, commentList, authorKey, authorWhere, withAvatars };

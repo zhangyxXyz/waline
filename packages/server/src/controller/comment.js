@@ -148,7 +148,7 @@ module.exports = class CommentController extends BaseRest {
         if (author) Object.assign(where, authorWhere(author));
         const total = await this.modelInstance.count(where);
         const items = await this.modelInstance.select(where, {
-          field: ['url', 'nick', 'insertedAt'],
+          field: ['url', 'nick', 'insertedAt', 'mail', 'user_id'],
           order: [
             { field: 'insertedAt', direction: 'desc' },
             { field: 'objectId', direction: 'desc' },
@@ -156,18 +156,23 @@ module.exports = class CommentController extends BaseRest {
           offset: (page - 1) * pageSize,
           limit: pageSize,
         });
-        return this.success({
-          total,
-          page,
-          pageSize,
-          hasMore: page * pageSize < total,
-          items: items.map((row) => ({
-            id: String(row.objectId),
-            url: row.url || '',
-            nick: row.nick || '',
-            time: row.insertedAt,
-          })),
-        });
+        return this.success(
+          await this.statisticsAvatars(
+            {
+              total,
+              page,
+              pageSize,
+              hasMore: page * pageSize < total,
+              items: items.map((row) => ({
+                id: String(row.objectId),
+                url: row.url || '',
+                nick: row.nick || '',
+                time: row.insertedAt,
+              })),
+            },
+            items,
+          ),
+        );
       }
       for (let offset = 0; ; offset += 500) {
         if (offset >= 100000) return this.ctx.throw(503, 'Statistics limit exceeded');
@@ -190,7 +195,7 @@ module.exports = class CommentController extends BaseRest {
         if (batch.length < 500) break;
       }
       if (this.get('type') === 'statistics-comments') {
-        return this.success(commentList(rows, this.get()));
+        return this.success(await this.statisticsAvatars(commentList(rows, this.get()), rows));
       }
       return this.success(await aggregateComments(rows, think.ip2region, currentRegionSettings()));
     }
@@ -245,6 +250,26 @@ module.exports = class CommentController extends BaseRest {
     const data = await fn.call(this);
 
     return this.jsonOrSuccess(data);
+  }
+
+  async statisticsAvatars(result, rows) {
+    const { withAvatars } = require('../service/comment-statistics.js');
+    const ids = new Set(result.items.map((item) => item.id));
+    const selected = rows.filter((row) => ids.has(String(row.objectId)));
+    const userIds = [...new Set(selected.map((row) => row.user_id).filter(Boolean))];
+    const users = userIds.length
+      ? await this.getModel('Users').select(
+          { objectId: ['IN', userIds] },
+          { field: ['display_name', 'email', 'avatar'] },
+        )
+      : [];
+    return withAvatars(
+      result,
+      selected,
+      users,
+      (comment) => think.service('avatar').stringify(comment),
+      this.config('avatarProxy'),
+    );
   }
 
   async getRegionAudit() {
