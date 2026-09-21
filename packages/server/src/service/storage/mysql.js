@@ -23,12 +23,17 @@ module.exports = class extends Base {
     const [before] = await this.select({ objectId: id });
     if (!before) throw visibilityEdit.fail('Comment not found', 404);
     return this.withThreadLock(before.rid || before.objectId, async (scoped) => {
-      const policy = await scoped.visibilityPolicy(users, user, id);
-      if (!revision || revision !== policy.revision)
-        {throw visibilityEdit.fail('visibilityStale', 409);}
+      // Share the transaction connection with account reads, including with a one-connection pool.
+      const scopedUsers = Object.create(users);
+      scopedUsers.model = scoped.model;
+      const policy = await scoped.visibilityPolicy(scopedUsers, user, id);
+      if (!revision || revision !== policy.revision) {
+        throw visibilityEdit.fail('visibilityStale', 409);
+      }
       const target = data.visibility;
-      if (!['public', 'private'].includes(target))
-        {throw visibilityEdit.fail('Invalid comment visibility', 400);}
+      if (!['public', 'private'].includes(target)) {
+        throw visibilityEdit.fail('Invalid comment visibility', 400);
+      }
       if (target !== (policy.comment.visibility || 'public')) {
         if (!policy[target].allowed) throw visibilityEdit.fail(policy[target].reason);
         Object.assign(
