@@ -39,6 +39,7 @@ const formatCmt = async (
   comment.canReply = !isPrivate(comment) || participant(loginUser, comment);
   delete comment.private_user_a;
   delete comment.private_user_b;
+  delete comment.visibility_source;
   ua = think.uaParser(ua);
   if (!think.config('disableUserAgent')) {
     comment.browser = `${ua.browser.name || ''}${(ua.browser.version || '')
@@ -113,6 +114,17 @@ module.exports = class CommentController extends BaseRest {
 
   async getAction() {
     this.ctx.set('Cache-Control', 'private, no-store');
+    if (this.get('type') === 'visibility') {
+      if (this.config('storage') !== 'mysql') return this.ctx.throw(400, 'visibilityUnsupported');
+      const policy = await this.modelInstance.visibilityPolicy(this.getModel('Users'), this.id);
+      return this.success({
+        public: policy.public,
+        private: policy.private,
+        revision: policy.revision,
+        original: policy.comment.comment,
+        visibility: policy.comment.visibility || 'public',
+      });
+    }
     if (this.get('type') === 'image-upload') return this.success(dashboard.images());
     if (this.get('type') === 'service-status') {
       return this.success({ enabled: dashboard.allowed(this.ctx.state.userInfo) });
@@ -272,7 +284,8 @@ module.exports = class CommentController extends BaseRest {
         return this.ctx.throw(400, 'Both participants need active accounts');
       }
     }
-    if (this.config('storage') === 'mysql') Object.assign(data, audience);
+    if (this.config('storage') === 'mysql')
+      {Object.assign(data, audience, { visibility_source: 'author' });}
 
     if (pid && this.ctx.state.deprecated) {
       data.comment = `[@${at}](#${pid}): ${data.comment}`;
@@ -455,10 +468,10 @@ module.exports = class CommentController extends BaseRest {
       return this.ctx.throw(403, this.locale('Comments are closed'));
     }
     const isAdmin = userInfo.type === 'administrator';
-    // Ownership, audience and topology are immutable even for administrators.
+    // Ownership/audience/topology are server-owned; visibility has a dedicated policy.
     const data = isAdmin
-      ? this.post('comment,like,status,sticky,nick,mail,link')
-      : this.post('comment,like');
+      ? this.post('comment,like,status,sticky,nick,mail,link,visibility')
+      : this.post('comment,like,visibility');
     let oldData = await this.modelInstance.select({ objectId: this.id });
 
     if (think.isEmpty(oldData) || think.isEmpty(data)) {
@@ -466,6 +479,14 @@ module.exports = class CommentController extends BaseRest {
     }
 
     [oldData] = oldData;
+    if ('visibility' in data && !['public', 'private'].includes(data.visibility)) {
+      return this.ctx.throw(400, 'Invalid comment visibility');
+    }
+    const changingVisibility =
+      'visibility' in data && data.visibility !== (oldData.visibility || 'public');
+    if (!changingVisibility) delete data.visibility;
+    if (changingVisibility && this.config('storage') !== 'mysql')
+      {return this.ctx.throw(400, 'visibilityUnsupported');}
     if (think.isBoolean(data.like)) {
       const likeIncMax = this.config('LIKE_INC_MAX') || 1;
 
@@ -475,6 +496,7 @@ module.exports = class CommentController extends BaseRest {
     }
 
     const preUpdateResp =
+      !changingVisibility &&
       !isPrivate(oldData) &&
       (await this.hook('preUpdate', {
         ...data,
@@ -485,9 +507,16 @@ module.exports = class CommentController extends BaseRest {
       return this.fail(preUpdateResp);
     }
 
-    const newData = await this.modelInstance.update(data, {
-      objectId: this.id,
-    });
+    const newData = changingVisibility
+      ? await this.modelInstance.changeVisibility(
+          this.getModel('Users'),
+          this.id,
+          data,
+          this.post('visibilityRevision'),
+        )
+      : await this.modelInstance.update(data, {
+          objectId: this.id,
+        });
 
     let cmtUser;
 
@@ -506,6 +535,8 @@ module.exports = class CommentController extends BaseRest {
 
     if (
       !isPrivate(oldData) &&
+      !isPrivate(newData[0]) &&
+      !changingVisibility &&
       oldData.status === 'waiting' &&
       data.status === 'approved' &&
       oldData.pid
@@ -540,7 +571,8 @@ module.exports = class CommentController extends BaseRest {
       );
     }
 
-    if (!isPrivate(oldData)) await this.hook('postUpdate', data);
+    if (!isPrivate(oldData) && !isPrivate(newData[0]) && !changingVisibility)
+      {await this.hook('postUpdate', data);}
 
     return this.success(cmtReturn);
   }

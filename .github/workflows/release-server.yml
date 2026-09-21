@@ -249,6 +249,7 @@ jobs:
           This version tag is intentionally reused for this update. Pin the client SHA-256 and image digest to identify the exact build.
 
           ### Features
+          - Comment visibility editing checks ownership, provenance and the reply tree on the server; the client explains denied changes and keeps edit drafts in memory.
           - Administrators can create administrator-only private roots and privately reply to account-owned comments. Private root replies retain administrator-only access, including after the original author loses the role.
           - Image upload dashboard switch controls the matching client's button, paste and drag-and-drop tools; manual image URLs and existing images remain unaffected.
           - SMTP settings precede mail templates, support environment defaults and custom TLS settings, and never return saved passwords to the browser.
@@ -272,6 +273,7 @@ jobs:
           - Matching administrator and comment-client assets are bundled under /assets/fork/.
 
           ### Deployment
+          After migration 001, apply assets/migrations/002-visibility-edit.mysql.sql before starting this release. It records privacy provenance; historical private messages remain locked.
           Back up the database before applying assets/migrations/001-private-replies.mysql.sql on an existing installation. Skip this migration if it has already been applied.
           Do not roll back to a server that ignores visibility fields after private replies have been created.
           Persist /app/runtime using a writable host mount so dashboard region settings survive container recreation. Saved dashboard settings override environment defaults.

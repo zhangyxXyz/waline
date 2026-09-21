@@ -22,6 +22,12 @@ module.exports = class PrivateCommentModel {
   update(data, where) {
     return this.model.update(data, this.where(where));
   }
+  visibilityPolicy(users, id) {
+    return this.model.visibilityPolicy(users, this.viewer, id);
+  }
+  changeVisibility(users, id, data, revision) {
+    return this.model.changeVisibility(users, this.viewer, id, data, revision);
+  }
   delete(where) {
     return this.model.delete(this.where(where));
   }

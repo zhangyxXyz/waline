@@ -61,5 +61,18 @@ export const generateLocale = (locale: string[]): WalineLocale =>
     privateReply: 'Private message',
     privateReplyHint: 'Visible only to both participants and administrators',
     privateAdminHint: 'Visible only to administrators',
+    visibilityLoading: 'Checking visibility permissions. Please wait.',
+    visibilityUnavailable:
+      'Visibility cannot be changed: permission check unavailable. Refresh and try again.',
+    visibilityReplies: 'This comment has replies. Its visibility cannot be changed.',
+    visibilityParent: 'Replies in a private conversation must remain private.',
+    visibilityOther: 'You cannot publish another person’s private message.',
+    visibilityOrigin:
+      'This private message was set by an administrator or has unknown history. It cannot be made public.',
+    visibilityAudience: 'The private audience cannot be determined. Visibility cannot be changed.',
+    visibilityPermission: 'You do not have permission to change this comment’s visibility.',
+    visibilityStale:
+      'This comment or conversation changed. Your draft is retained; refresh before retrying.',
+    visibilityUnsupported: 'This server does not support visibility changes.',
     ...Object.fromEntries(locale.map((item, index) => [localeKeys[index], item])),
   }) as unknown as WalineLocale;

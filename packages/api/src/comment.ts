@@ -189,6 +189,7 @@ export const deleteComment = ({
     .then((resp) => errorCheck(resp, 'Delete comment'));
 
 interface UpdateWalineCommentData extends Partial<WalineCommentData> {
+  visibilityRevision?: string;
   /**
    * 点赞还是取消点赞
    *
@@ -212,6 +213,39 @@ interface UpdateWalineCommentData extends Partial<WalineCommentData> {
    */
   sticky?: 0 | 1;
 }
+
+export interface VisibilityPolicy {
+  revision: string;
+  original: string;
+  visibility: 'public' | 'private';
+  public: { allowed: boolean; reason: string };
+  private: { allowed: boolean; reason: string };
+}
+
+export const getVisibilityPolicy = async ({
+  serverURL,
+  token,
+  objectId,
+  signal,
+}: Pick<BaseAPIOptions, 'serverURL'> & {
+  token: string;
+  objectId: number;
+  signal?: AbortSignal;
+}): Promise<VisibilityPolicy> => {
+  const response = await fetch(`${getFetchPrefix(serverURL)}comment/${objectId}?type=visibility`, {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: 'no-store',
+    signal,
+  });
+  const result = (await response.json()) as {
+    errno: number;
+    errmsg?: string;
+    data: VisibilityPolicy;
+  };
+  if (!response.ok || result.errno !== 0 || !result.data?.revision)
+    {throw new Error(result.errmsg || 'visibilityUnavailable');}
+  return result.data;
+};
 export interface UpdateCommentOptions extends BaseAPIOptions {
   /**
    * 用户令牌

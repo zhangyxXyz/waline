@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 
 import { transpileModule, ScriptTarget } from 'typescript';
 import { describe, expect, it } from 'vitest';
-import { compile, createSSRApp } from 'vue';
+import { compile, createSSRApp, ref, computed, watch } from 'vue';
 import { renderToString } from 'vue/server-renderer';
 
 // Render the actual client control, independently of any theme or live account.
@@ -21,6 +21,10 @@ const renderControl = (overrides = {}) =>
         replyId: undefined,
         canPrivateReply: false,
         edit: null,
+        isPrivate: false,
+        privateBlockedReason: '',
+        visibilityMessage: (reason: string) => reason,
+        onPrivateClick: () => {},
         userInfo: { token: 'test-session', type: 'guest' },
         privateChoice: false,
         privateReply: false,
@@ -35,6 +39,68 @@ const renderControl = (overrides = {}) =>
   );
 
 describe('private comment entry', () => {
+  it('blocks forbidden local toggles with a reason and never persists an edit draft when unlocked', () => {
+    const script = source.slice(
+      source.indexOf('const privateSelected ='),
+      source.indexOf('const userMeta ='),
+    );
+    const code = transpileModule(script, {
+      compilerOptions: { target: ScriptTarget.ES2022 },
+    }).outputText;
+    const alerts: string[] = [];
+    const draft = ref('secret draft');
+    const saved = ref('existing public draft');
+    const controls = new Function(
+      'ref',
+      'computed',
+      'watch',
+      'props',
+      'userInfo',
+      'config',
+      'privateDraft',
+      'savedEditor',
+      'alert',
+      'getVisibilityPolicy',
+      `${code}; return { privateChoice, visibilityPolicy, onPrivateClick, editor };`,
+    )(
+      ref,
+      computed,
+      watch,
+      { edit: { visibility: 'private', objectId: 2 } },
+      ref({ token: '' }),
+      ref({ serverURL: 'https://example.invalid', locale: { visibilityOrigin: 'Cannot publish' } }),
+      draft,
+      saved,
+      (message: string) => alerts.push(message),
+      () => Promise.reject(new Error('No network expected')),
+    );
+    controls.visibilityPolicy.value = {
+      public: { allowed: false, reason: 'visibilityOrigin' },
+      private: { allowed: false, reason: 'visibilityReplies' },
+    };
+    let prevented = false;
+    controls.onPrivateClick({
+      preventDefault: () => {
+        prevented = true;
+      },
+    });
+    controls.privateChoice.value = false;
+    expect(prevented).toBe(true);
+    expect(alerts).toStrictEqual(['Cannot publish']);
+    expect(controls.privateChoice.value).toBe(true);
+    controls.visibilityPolicy.value = {
+      public: { allowed: true, reason: '' },
+      private: { allowed: false, reason: 'visibilityReplies' },
+    };
+    controls.privateChoice.value = false;
+    expect(controls.editor.value).toBe('secret draft');
+    controls.editor.value = 'edited secret';
+    expect(saved.value).toBe('existing public draft');
+    controls.privateChoice.value = true;
+    expect(controls.privateChoice.value).toBe(true);
+    expect(controls.editor.value).toBe('edited secret');
+  });
+
   it('submits the private audience for a top-level message as well as a reply', async () => {
     // Execute the real payload preparation, stopping before network submission.
     const start = source.indexOf('const submitComment = async');
@@ -98,14 +164,30 @@ describe('private comment entry', () => {
       canPrivateReply: true,
       privateReply: true,
       privateChoice: true,
+      privateBlockedReason: 'visibilityParent',
     });
     expect(html).toContain(' checked');
-    expect(html).toContain(' disabled');
+    expect(html).toContain('aria-disabled="true"');
   });
 
-  it('does not offer visibility changes while editing', async () => {
-    await expect(renderControl({ edit: { visibility: 'public' } })).resolves.not.toContain(
+  it('shows the visibility control for a public edit', async () => {
+    await expect(renderControl({ edit: { visibility: 'public' } })).resolves.toContain(
       'type="checkbox"',
     );
+  });
+
+  it('shows a checked, disabled lock when editing a private message for either role', async () => {
+    for (const type of ['guest', 'administrator']) {
+      const html = await renderControl({
+        edit: { visibility: 'private' },
+        isPrivate: true,
+        privateChoice: true,
+        privateBlockedReason: 'visibilityOrigin',
+        userInfo: { token: 'test-session', type },
+      });
+      expect(html).toContain('type="checkbox"');
+      expect(html).toContain(' checked');
+      expect(html).toContain('aria-disabled="true"');
+    }
   });
 });

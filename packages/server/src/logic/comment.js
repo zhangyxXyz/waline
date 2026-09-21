@@ -24,6 +24,7 @@ module.exports = class CommentLogic extends Base {
 
     switch (type) {
       case 'image-upload':
+      case 'visibility':
       case 'service-status': {
         return;
       }
@@ -141,7 +142,7 @@ module.exports = class CommentLogic extends Base {
     const { userInfo } = this.ctx.state;
     const data = this.post();
     const immutable = [
-      'visibility',
+      'visibility_source',
       'private_user_a',
       'private_user_b',
       'user_id',

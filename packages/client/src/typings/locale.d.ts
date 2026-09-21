@@ -25,6 +25,16 @@ export interface WalineLocale extends WalineDateLocale, WalineLevelLocale, Walin
   privateReply: string;
   privateReplyHint: string;
   privateAdminHint: string;
+  visibilityLoading: string;
+  visibilityUnavailable: string;
+  visibilityReplies: string;
+  visibilityParent: string;
+  visibilityOther: string;
+  visibilityOrigin: string;
+  visibilityAudience: string;
+  visibilityPermission: string;
+  visibilityStale: string;
+  visibilityUnsupported: string;
   nick: string;
   mail: string;
   link: string;

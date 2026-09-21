@@ -1,8 +1,14 @@
 <script setup lang="ts">
 //
 import { useDebounceFn, useEventListener, watchImmediate } from '@vueuse/core';
-import type { WalineComment, WalineCommentData, UserInfo } from '@waline/api';
-import { addComment, getImageUploadSettings, login, updateComment } from '@waline/api';
+import type { WalineComment, WalineCommentData, UserInfo, VisibilityPolicy } from '@waline/api';
+import {
+  addComment,
+  getImageUploadSettings,
+  getVisibilityPolicy,
+  login,
+  updateComment,
+} from '@waline/api';
 import autosize from 'autosize';
 import type { DeepReadonly, CSSProperties } from 'vue';
 import {
@@ -70,6 +76,7 @@ const emit = defineEmits<{
 const config = inject(configKey)!;
 
 const savedEditor = useEditor();
+const userInfo = useUserInfo();
 // Private drafts stay in component memory; public drafts retain existing persistence.
 const privateDraft = ref('');
 let unmounted = false;
@@ -78,24 +85,75 @@ onUnmounted(() => {
   privateDraft.value = '';
 });
 const privateSelected = ref(false);
-const isPrivate = computed(
-  () => props.privateReply || props.edit?.visibility === 'private' || privateSelected.value,
+const editVisibility = ref<'public' | 'private'>(props.edit?.visibility || 'public');
+const visibilityPolicy = ref<VisibilityPolicy | null>(null);
+const visibilityReason = ref('visibilityLoading');
+watch(
+  () => [props.edit, userInfo.value.token, config.value.serverURL] as const,
+  async ([edit, token, serverURL], _previous, onCleanup) => {
+    editVisibility.value = edit?.visibility || 'public';
+    visibilityPolicy.value = null;
+    visibilityReason.value = 'visibilityLoading';
+    if (!edit || !token) return;
+    const controller = new AbortController();
+    onCleanup(() => controller.abort());
+    try {
+      const policy = await getVisibilityPolicy({
+        serverURL,
+        token,
+        objectId: edit.objectId,
+        signal: controller.signal,
+      });
+      if (!controller.signal.aborted) {
+        if (policy.original !== edit.orig || policy.visibility !== (edit.visibility || 'public'))
+          {visibilityReason.value = 'visibilityStale';}
+        else visibilityPolicy.value = policy;
+      }
+    } catch {
+      if (!controller.signal.aborted) visibilityReason.value = 'visibilityUnavailable';
+    }
+  },
+  { immediate: true },
+);
+const privateBlockedReason = computed(() => {
+  if (props.edit) {
+    const target = editVisibility.value === 'private' ? 'public' : 'private';
+    // Returning to the original local state never changes server visibility.
+    if (target === (props.edit.visibility || 'public')) return '';
+    const policy = visibilityPolicy.value?.[target];
+    return policy ? (policy.allowed ? '' : policy.reason) : visibilityReason.value;
+  }
+  return props.privateReply ? 'visibilityParent' : '';
+});
+const visibilityMessage = (reason: string): string => {
+  const key = reason.match(/\bvisibility[A-Z]\w*$/)?.[0] || reason;
+  return (config.value.locale as unknown as Record<string, string>)[key] || reason;
+};
+const onPrivateClick = (event: MouseEvent): void => {
+  if (privateBlockedReason.value) {
+    event.preventDefault();
+    alert(visibilityMessage(privateBlockedReason.value));
+  }
+};
+const isPrivate = computed(() =>
+  props.edit ? editVisibility.value === 'private' : props.privateReply || privateSelected.value,
 );
 const privateChoice = computed({
   get: () => Boolean(isPrivate.value),
   set: (value: boolean) => {
-    if (!props.privateReply) privateSelected.value = value;
+    if (privateBlockedReason.value) return;
+    if (props.edit) editVisibility.value = value ? 'private' : 'public';
+    else if (!props.privateReply) privateSelected.value = value;
   },
 });
 const editor = computed({
-  get: () => (isPrivate.value ? privateDraft.value : savedEditor.value),
+  get: () => (props.edit || isPrivate.value ? privateDraft.value : savedEditor.value),
   set: (value: string) => {
-    if (isPrivate.value) privateDraft.value = value;
+    if (props.edit || isPrivate.value) privateDraft.value = value;
     else savedEditor.value = value;
   },
 });
 const userMeta = useUserMeta();
-const userInfo = useUserInfo();
 
 const inputRefs = ref<Record<string, HTMLInputElement>>({});
 const textAreaRef = useTemplateRef<HTMLTextAreaElement>('textarea');
@@ -364,7 +422,17 @@ const submitComment = async (): Promise<void> => {
       serverURL,
       lang,
       token: userInfo.value.token,
-      comment: props.edit ? { comment: comment.comment } : comment,
+      comment: props.edit
+        ? {
+            comment: comment.comment,
+            ...(editVisibility.value === (props.edit.visibility || 'public')
+              ? {}
+              : {
+                  visibility: editVisibility.value,
+                  visibilityRevision: visibilityPolicy.value?.revision,
+                }),
+          }
+        : comment,
     };
 
     const response = await (props.edit
@@ -378,7 +446,7 @@ const submitComment = async (): Promise<void> => {
 
     if (unmounted || submitToken !== userInfo.value.token) return;
     if (response.errmsg) {
-      alert(response.errmsg);
+      alert(visibilityMessage(response.errmsg));
 
       return;
     }
@@ -402,7 +470,7 @@ const submitComment = async (): Promise<void> => {
   } catch (err: unknown) {
     isSubmitting.value = false;
 
-    alert((err as TypeError).message);
+    alert(visibilityMessage((err as TypeError).message));
   }
 };
 
@@ -672,10 +740,18 @@ onMounted(() => {
       </div>
 
       <label
-        v-if="(!replyId || canPrivateReply) && !edit && userInfo.token"
+        v-if="edit || ((!replyId || canPrivateReply) && userInfo.token)"
         class="wl-private-reply"
+        :data-visibility-reason="
+          privateBlockedReason ? visibilityMessage(privateBlockedReason) : undefined
+        "
+        @click="onPrivateClick"
       >
-        <input v-model="privateChoice" type="checkbox" :disabled="privateReply" />
+        <input
+          v-model="privateChoice"
+          type="checkbox"
+          :aria-disabled="Boolean(privateBlockedReason)"
+        />
         {{ locale.privateReply }} —
         {{
           !replyId && userInfo.type === 'administrator'

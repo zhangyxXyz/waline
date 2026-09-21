@@ -1,8 +1,46 @@
 const Base = require('./base.js');
 const { normalizeOrder, toSqlOrder } = require('./order.js');
 const { readPredicate } = require('../comment-privacy.js');
+const visibilityEdit = require('../visibility-edit.js');
 
 module.exports = class extends Base {
+  async withThreadLock(id, run) {
+    const transaction = this.model(this.tableName);
+    return transaction.transaction(async () => {
+      const scoped = Object.create(this);
+      scoped.inCommentTransaction = true;
+      scoped.model = (name) => this.model(name).db(transaction.db());
+      if (id) await scoped.model(this.tableName).where({ id }).lock(true).select();
+      return run(scoped);
+    });
+  }
+
+  visibilityPolicy(users, user, id) {
+    return visibilityEdit.policy(this, users, user, id);
+  }
+
+  async changeVisibility(users, user, id, data, revision) {
+    const [before] = await this.select({ objectId: id });
+    if (!before) throw visibilityEdit.fail('Comment not found', 404);
+    return this.withThreadLock(before.rid || before.objectId, async (scoped) => {
+      const policy = await scoped.visibilityPolicy(users, user, id);
+      if (!revision || revision !== policy.revision)
+        {throw visibilityEdit.fail('visibilityStale', 409);}
+      const target = data.visibility;
+      if (!['public', 'private'].includes(target))
+        {throw visibilityEdit.fail('Invalid comment visibility', 400);}
+      if (target !== (policy.comment.visibility || 'public')) {
+        if (!policy[target].allowed) throw visibilityEdit.fail(policy[target].reason);
+        Object.assign(
+          data,
+          target === 'private' ? policy.audience : { private_user_a: null, private_user_b: null },
+        );
+        data.visibility_source =
+          String(user.objectId) === String(policy.comment.user_id) ? 'author' : 'admin';
+      }
+      return scoped.update(data, { objectId: id });
+    });
+  }
   mapOrderField(field) {
     return field === 'objectId' ? 'id' : field;
   }
@@ -99,6 +137,26 @@ module.exports = class extends Base {
   }
 
   async add(data) {
+    if (this.tableName === 'Comment' && data.pid && !this.inCommentTransaction) {
+      return this.withThreadLock(data.rid || data.pid, async (scoped) => {
+        const [parent] = await scoped.select({ objectId: data.pid });
+        const [root] = await scoped.select({ objectId: data.rid });
+        if (
+          !parent ||
+          !root ||
+          parent.url !== data.url ||
+          root.url !== data.url ||
+          String(parent.rid || parent.objectId) !== String(root.objectId) ||
+          ([parent, root].some((c) => c.visibility === 'private') &&
+            (data.visibility !== 'private' ||
+              String(data.private_user_a) !== String(parent.private_user_a) ||
+              String(data.private_user_b) !== String(parent.private_user_b)))
+        ) {
+          throw visibilityEdit.fail('visibilityStale', 409);
+        }
+        return scoped.add(data);
+      });
+    }
     if (data.objectId) {
       data.id = data.objectId;
       delete data.objectId;
@@ -115,6 +173,18 @@ module.exports = class extends Base {
   }
 
   async update(data, where) {
+    if (this.tableName === 'Comment' && !this.inCommentTransaction) {
+      const list = await this.select(where);
+      const result = [];
+      for (const item of list) {
+        result.push(
+          ...(await this.withThreadLock(item.rid || item.objectId, (scoped) =>
+            scoped.update(data, { ...where, objectId: item.objectId }),
+          )),
+        );
+      }
+      return result;
+    }
     const list = await this.model(this.tableName).where(this.parseWhere(where)).select();
 
     return Promise.all(

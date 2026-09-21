@@ -61,9 +61,16 @@ module.exports = class DBController extends BaseRest {
     const data = this.post();
     if (
       String(table).toLowerCase() === 'comment' &&
-      ['visibility', 'private_user_a', 'private_user_b', 'user_id', 'pid', 'rid', 'url'].some(
-        (key) => key in data,
-      )
+      [
+        'visibility',
+        'visibility_source',
+        'private_user_a',
+        'private_user_b',
+        'user_id',
+        'pid',
+        'rid',
+        'url',
+      ].some((key) => key in data)
     ) {
       return this.fail(400, 'Comment audience and ownership are immutable');
     }

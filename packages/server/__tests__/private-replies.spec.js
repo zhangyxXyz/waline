@@ -28,7 +28,7 @@ const schema = `CREATE TABLE Comment (
  link TEXT, mail TEXT, nick TEXT, pid INTEGER, rid INTEGER, sticky INTEGER,
  status TEXT DEFAULT 'approved', "like" INTEGER DEFAULT 0, ua TEXT, url TEXT,
  createdAt TEXT, updatedAt TEXT, visibility TEXT DEFAULT 'public',
- private_user_a INTEGER, private_user_b INTEGER);
+ private_user_a INTEGER, private_user_b INTEGER, visibility_source TEXT DEFAULT 'legacy');
  CREATE TABLE Users (id INTEGER PRIMARY KEY, display_name TEXT, email TEXT, url TEXT,
  type TEXT, avatar TEXT, "2fa" TEXT, label TEXT); CREATE TABLE Counter (id INTEGER PRIMARY KEY, url TEXT);`;
 const sqlValue = (value) =>
@@ -43,6 +43,23 @@ const transport = (table) => {
   let group, limit, order;
   let offset = 0;
   const query = {
+    db() {
+      return query;
+    },
+    lock() {
+      return query;
+    },
+    async transaction(run) {
+      db.exec('BEGIN');
+      try {
+        const result = await run();
+        db.exec('COMMIT');
+        return result;
+      } catch (err) {
+        db.exec('ROLLBACK');
+        throw err;
+      }
+    },
     where(value) {
       where = value;
       return query;
@@ -600,6 +617,129 @@ describe('private reply access', () => {
     const { readPredicate } = require('../src/service/comment-privacy.js');
     expect(readPredicate({ objectId: "1' OR 1=1 --", type: 'guest' })).toBe(
       "`visibility` = 'public'",
+    );
+  });
+
+  it('allows the author to publish a self-private leaf and saves content atomically', async () => {
+    db.exec("UPDATE Comment SET visibility_source='author' WHERE id=2");
+    const policy = await json('/api/comment/2?type=visibility', 1);
+    expect(policy.data.public.allowed).toBe(true);
+    const result = await json('/api/comment/2', 1, 'PUT', {
+      visibility: 'public',
+      visibilityRevision: policy.data.revision,
+      comment: 'Now public',
+    });
+    expect(result.errno).toBe(0);
+    expect(result.data.visibility).toBe('public');
+    expect(
+      db.prepare('SELECT private_user_a,private_user_b,comment FROM Comment WHERE id=2').get(),
+    ).toMatchObject({ private_user_a: null, private_user_b: null, comment: 'Now public' });
+    expect(sideEffect).not.toHaveBeenCalled();
+    expect(notifyRun).not.toHaveBeenCalled();
+  });
+
+  it('blocks unknown-origin and administrator-imposed privacy and other people’s private messages', async () => {
+    for (const source of ['legacy', 'admin']) {
+      db.prepare('UPDATE Comment SET visibility_source=? WHERE id=2').run(source);
+      const policy = await json('/api/comment/2?type=visibility', 1);
+      expect(policy.data.public.reason).toBe('visibilityOrigin');
+      expect(
+        (
+          await json('/api/comment/2', 1, 'PUT', {
+            visibility: 'public',
+            visibilityRevision: policy.data.revision,
+            comment: 'must not save',
+          })
+        ).errno,
+      ).toBe(403);
+    }
+    db.exec("UPDATE Comment SET visibility_source='author' WHERE id=2");
+    const admin = await json('/api/comment/2?type=visibility', 4);
+    expect(admin.data.public.reason).toBe('visibilityOther');
+    expect(
+      (
+        await json('/api/comment/2', 4, 'PUT', {
+          visibility: 'public',
+          visibilityRevision: admin.data.revision,
+        })
+      ).errno,
+    ).toBe(403);
+    expect(db.prepare('SELECT comment FROM Comment WHERE id=2').get().comment).toBe(
+      'PRIVATE_SENTINEL',
+    );
+  });
+
+  it('rechecks newly added hidden replies at submission and leaves content unchanged', async () => {
+    db.exec("UPDATE Comment SET visibility_source='author' WHERE id=2");
+    const policy = await json('/api/comment/2?type=visibility', 1);
+    expect(policy.data.public.allowed).toBe(true);
+    await post(2, { pid: 2, rid: 1, visibility: 'private' });
+    db.exec("UPDATE Comment SET status='spam' WHERE pid=2");
+    const result = await json('/api/comment/2', 1, 'PUT', {
+      visibility: 'public',
+      visibilityRevision: policy.data.revision,
+      comment: 'must not save',
+    });
+    expect(result.errno).toBe(403);
+    expect(result.errmsg).toBe('visibilityReplies');
+    expect(db.prepare('SELECT comment,visibility FROM Comment WHERE id=2').get()).toMatchObject({
+      comment: 'PRIVATE_SENTINEL',
+      visibility: 'private',
+    });
+  });
+
+  it('never publishes a leaf whose parent/root is private', async () => {
+    const reply = await post(2, { pid: 2, rid: 1 });
+    const policy = await json(`/api/comment/${reply.data.objectId}?type=visibility`, 2);
+    expect(policy.data.public.reason).toBe('visibilityParent');
+  });
+
+  it('rejects stale revisions and forged provenance or audience', async () => {
+    db.exec("UPDATE Comment SET visibility_source='author' WHERE id=2");
+    const policy = await json('/api/comment/2?type=visibility', 1);
+    await json('/api/comment/2', 1, 'PUT', { comment: 'new version' });
+    expect(
+      (
+        await json('/api/comment/2', 1, 'PUT', {
+          visibility: 'public',
+          visibilityRevision: policy.data.revision,
+        })
+      ).errno,
+    ).toBe(409);
+    expect((await json('/api/comment/2', 4, 'PUT', { visibility_source: 'author' })).errno).toBe(
+      400,
+    );
+    expect((await json('/api/comment/2', 4, 'PUT', { private_user_a: 3 })).errno).toBe(400);
+    expect((await json('/api/comment/2?type=visibility', 3)).errno).not.toBe(0);
+    expect((await json('/api/comment/2?type=visibility')).errno).not.toBe(0);
+  });
+
+  it('lets an administrator privatize another author’s leaf without becoming its author', async () => {
+    db.exec('DELETE FROM Comment WHERE id=2');
+    const policy = await json('/api/comment/1?type=visibility', 4);
+    expect(policy.data.private.allowed).toBe(true);
+    const result = await json('/api/comment/1', 4, 'PUT', {
+      visibility: 'private',
+      visibilityRevision: policy.data.revision,
+    });
+    expect(result.errno).toBe(0);
+    expect(
+      db
+        .prepare(
+          'SELECT user_id,private_user_a,private_user_b,visibility_source FROM Comment WHERE id=1',
+        )
+        .get(),
+    ).toMatchObject({
+      user_id: 2,
+      private_user_a: 2,
+      private_user_b: 4,
+      visibility_source: 'admin',
+    });
+    expect((await json('/api/comment/1?type=visibility', 2)).data.public.reason).toBe(
+      'visibilityOrigin',
+    );
+    expect((await json('/api/comment/3?type=visibility', 4)).data.private.reason).toBe(
+      'visibilityAudience',
     );
   });
 });
