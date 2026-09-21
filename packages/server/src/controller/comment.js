@@ -129,6 +129,71 @@ module.exports = class CommentController extends BaseRest {
     if (this.get('type') === 'service-status') {
       return this.success({ enabled: dashboard.allowed(this.ctx.state.userInfo) });
     }
+    if (['statistics', 'statistics-comments'].includes(this.get('type'))) {
+      // Public statistics have the same audience even when requested by an admin.
+      if (!dashboard.allowed({})) return this.ctx.throw(403);
+      const {
+        aggregateComments,
+        commentList,
+        authorWhere,
+      } = require('../service/comment-statistics.js');
+      const rows = [];
+      const where = {
+        status: 'approved',
+        ...(this.config('storage') === 'mysql' ? { visibility: 'public' } : {}),
+      };
+      if (this.get('type') === 'statistics-comments' && this.config('storage') === 'mysql') {
+        const { author, url, page, pageSize } = this.get();
+        if (url) where.url = url;
+        if (author) Object.assign(where, authorWhere(author));
+        const total = await this.modelInstance.count(where);
+        const items = await this.modelInstance.select(where, {
+          field: ['url', 'nick', 'insertedAt'],
+          order: [
+            { field: 'insertedAt', direction: 'desc' },
+            { field: 'objectId', direction: 'desc' },
+          ],
+          offset: (page - 1) * pageSize,
+          limit: pageSize,
+        });
+        return this.success({
+          total,
+          page,
+          pageSize,
+          hasMore: page * pageSize < total,
+          items: items.map((row) => ({
+            id: String(row.objectId),
+            url: row.url || '',
+            nick: row.nick || '',
+            time: row.insertedAt,
+          })),
+        });
+      }
+      for (let offset = 0; ; offset += 500) {
+        if (offset >= 100000) return this.ctx.throw(503, 'Statistics limit exceeded');
+        const batch = await this.modelInstance.select(where, {
+          field: [
+            'nick',
+            'mail',
+            'user_id',
+            'url',
+            'insertedAt',
+            ...(this.get('type') === 'statistics' ? ['ip'] : []),
+            'status',
+            ...(this.config('storage') === 'mysql' ? ['visibility'] : []),
+          ],
+          order: [{ field: 'objectId', direction: 'asc' }],
+          limit: 500,
+          offset,
+        });
+        rows.push(...batch);
+        if (batch.length < 500) break;
+      }
+      if (this.get('type') === 'statistics-comments') {
+        return this.success(commentList(rows, this.get()));
+      }
+      return this.success(await aggregateComments(rows, think.ip2region, currentRegionSettings()));
+    }
     if (this.get('type') === 'level-settings') {
       if (this.ctx.state.userInfo?.type !== 'administrator') return this.ctx.throw(403);
       this.ctx.set('Cache-Control', 'private, no-store');
@@ -284,8 +349,9 @@ module.exports = class CommentController extends BaseRest {
         return this.ctx.throw(400, 'Both participants need active accounts');
       }
     }
-    if (this.config('storage') === 'mysql')
-      {Object.assign(data, audience, { visibility_source: 'author' });}
+    if (this.config('storage') === 'mysql') {
+      Object.assign(data, audience, { visibility_source: 'author' });
+    }
 
     if (pid && this.ctx.state.deprecated) {
       data.comment = `[@${at}](#${pid}): ${data.comment}`;
@@ -485,8 +551,9 @@ module.exports = class CommentController extends BaseRest {
     const changingVisibility =
       'visibility' in data && data.visibility !== (oldData.visibility || 'public');
     if (!changingVisibility) delete data.visibility;
-    if (changingVisibility && this.config('storage') !== 'mysql')
-      {return this.ctx.throw(400, 'visibilityUnsupported');}
+    if (changingVisibility && this.config('storage') !== 'mysql') {
+      return this.ctx.throw(400, 'visibilityUnsupported');
+    }
     if (think.isBoolean(data.like)) {
       const likeIncMax = this.config('LIKE_INC_MAX') || 1;
 
@@ -571,8 +638,9 @@ module.exports = class CommentController extends BaseRest {
       );
     }
 
-    if (!isPrivate(oldData) && !isPrivate(newData[0]) && !changingVisibility)
-      {await this.hook('postUpdate', data);}
+    if (!isPrivate(oldData) && !isPrivate(newData[0]) && !changingVisibility) {
+      await this.hook('postUpdate', data);
+    }
 
     return this.success(cmtReturn);
   }

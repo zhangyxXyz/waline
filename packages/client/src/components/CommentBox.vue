@@ -74,6 +74,7 @@ const emit = defineEmits<{
 
 // oxlint-disable-next-line typescript/no-non-null-assertion
 const config = inject(configKey)!;
+const notify = (message: string): void => config.value.notify(message);
 
 const savedEditor = useEditor();
 const userInfo = useUserInfo();
@@ -105,9 +106,9 @@ watch(
         signal: controller.signal,
       });
       if (!controller.signal.aborted) {
-        if (policy.original !== edit.orig || policy.visibility !== (edit.visibility || 'public'))
-          {visibilityReason.value = 'visibilityStale';}
-        else visibilityPolicy.value = policy;
+        if (policy.original !== edit.orig || policy.visibility !== (edit.visibility || 'public')) {
+          visibilityReason.value = 'visibilityStale';
+        } else visibilityPolicy.value = policy;
       }
     } catch {
       if (!controller.signal.aborted) visibilityReason.value = 'visibilityUnavailable';
@@ -132,7 +133,7 @@ const visibilityMessage = (reason: string): string => {
 const onPrivateClick = (event: MouseEvent): void => {
   if (privateBlockedReason.value) {
     event.preventDefault();
-    alert(visibilityMessage(privateBlockedReason.value));
+    notify(visibilityMessage(privateBlockedReason.value));
   }
 };
 const isPrivate = computed(() =>
@@ -276,7 +277,7 @@ const uploadImage = async (file: File): Promise<void> => {
 
     editor.value = editor.value.replace(uploadText, `\r\n![${file.name}](${url})`);
   } catch (err) {
-    alert((err as Error).message);
+    notify((err as Error).message);
     editor.value = editor.value.replace(uploadText, '');
   } finally {
     isSubmitting.value = false;
@@ -355,7 +356,7 @@ const submitComment = async (): Promise<void> => {
       if (requiredMeta.includes('nick') && !comment.nick) {
         inputRefs.value.nick.focus();
 
-        alert(locale.value.nickError);
+        notify(locale.value.nickError);
 
         return;
       }
@@ -367,7 +368,7 @@ const submitComment = async (): Promise<void> => {
       ) {
         inputRefs.value.mail.focus();
 
-        alert(locale.value.mailError);
+        notify(locale.value.mailError);
 
         return;
       }
@@ -387,7 +388,7 @@ const submitComment = async (): Promise<void> => {
   }
 
   if (!isWordNumberLegal.value) {
-    alert(
+    notify(
       locale.value.wordHint
         .replace('$0', (wordLimit as [number, number])[0].toString())
         .replace('$1', (wordLimit as [number, number])[1].toString())
@@ -446,7 +447,7 @@ const submitComment = async (): Promise<void> => {
 
     if (unmounted || submitToken !== userInfo.value.token) return;
     if (response.errmsg) {
-      alert(visibilityMessage(response.errmsg));
+      notify(visibilityMessage(response.errmsg));
 
       return;
     }
@@ -470,7 +471,7 @@ const submitComment = async (): Promise<void> => {
   } catch (err: unknown) {
     isSubmitting.value = false;
 
-    alert(visibilityMessage((err as TypeError).message));
+    notify(visibilityMessage((err as TypeError).message));
   }
 };
 

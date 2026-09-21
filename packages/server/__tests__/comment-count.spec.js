@@ -55,6 +55,27 @@ describe('comment count API', () => {
         .join('&')}`,
     ).then((response) => response.json());
 
+  it('serves public statistics without a page path or sensitive fields', async () => {
+    commentSelect.mockResolvedValueOnce([
+      {
+        nick: 'Visitor',
+        mail: 'private@example.test',
+        status: 'approved',
+        visibility: 'public',
+        insertedAt: '2026-01-01',
+        ip: '',
+      },
+      { nick: 'Secret', status: 'approved', visibility: 'private', insertedAt: '2026-01-01' },
+    ]);
+    const response = await fetch(`http://localhost:${port}/api/comment?type=statistics`);
+    const body = await response.json();
+    expect(body.errno).toBe(0);
+    expect(body.data.version).toBe(1);
+    expect(body.data.total).toBe(1);
+    expect(JSON.stringify(body)).not.toMatch(/Secret|private@example|"ip"|"mail"/u);
+    expect(commentSelect.mock.calls[0][0].status).toBe('approved');
+  });
+
   it('uses a scalar database count for one URL', async () => {
     commentCount.mockResolvedValueOnce(7);
 
@@ -66,6 +87,30 @@ describe('comment count API', () => {
       url: ['IN', ['/single']],
     });
     expect(commentSelect).not.toHaveBeenCalled();
+  });
+
+  it('serves paginated public comment metadata and rejects invalid pagination', async () => {
+    commentSelect.mockResolvedValueOnce(
+      Array.from({ length: 25 }, (_, i) => ({
+        objectId: i + 1,
+        nick: 'Visitor',
+        status: 'approved',
+        visibility: 'public',
+        url: '/guestbook/',
+        insertedAt: '2026-01-01',
+      })),
+    );
+    const body = await fetch(
+      `http://localhost:${port}/api/comment?type=statistics-comments&page=2`,
+    ).then((response) => response.json());
+    expect(body.errno).toBe(0);
+    expect(body.data.page).toBe(2);
+    expect(body.data.total).toBe(25);
+    expect(body.data.items).toHaveLength(5);
+    const invalid = await fetch(
+      `http://localhost:${port}/api/comment?type=statistics-comments&page=0`,
+    ).then((response) => response.json());
+    expect(invalid.errno).not.toBe(0);
   });
 
   it('uses grouped counts for multiple URLs and fills missing values', async () => {

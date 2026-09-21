@@ -23,7 +23,19 @@ module.exports = class CommentLogic extends Base {
     }
 
     switch (type) {
+      case 'statistics-comments': {
+        const { author, url } = this.get();
+        if (author && url) return this.ctx.throw(400);
+        this.rules = {
+          author: { string: true, regexp: /^[a-f0-9]{56,2048}$/u },
+          url: { string: true, length: { max: 2048 } },
+          page: { int: { min: 1, max: 5000 }, default: 1 },
+          pageSize: { int: { min: 1, max: 50 }, default: 20 },
+        };
+        return;
+      }
       case 'image-upload':
+      case 'statistics':
       case 'visibility':
       case 'service-status': {
         return;

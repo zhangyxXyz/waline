@@ -254,6 +254,9 @@ export interface WalineProps {
 
   imageUploader?: WalineImageUploader;
 
+  /** Display a plain-text editor message. Defaults to the browser alert. */
+  notify?: (message: string) => void;
+
   /**
    * 自定义数学公式处理方法，用于预览。
    *

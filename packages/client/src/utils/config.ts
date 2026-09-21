@@ -79,6 +79,9 @@ export const getConfig = ({
   commentSorting = 'latest',
   emoji = DEFAULT_EMOJI,
   imageUploader,
+  notify = (message: string): void => {
+    alert(message);
+  },
   highlighter,
   texRenderer,
   search,
@@ -108,6 +111,7 @@ export const getConfig = ({
   // oxlint-disable-next-line typescript/strict-boolean-expressions, typescript/prefer-nullish-coalescing
   reaction: reaction === true ? DEFAULT_REACTION : reaction || null,
   imageUploader: withFallback(imageUploader, defaultUploadImage),
+  notify,
   highlighter: withFallback(highlighter, defaultHighlighter),
   texRenderer: withFallback(texRenderer, defaultTeXRenderer),
   emoji: withFallback(emoji, DEFAULT_EMOJI),

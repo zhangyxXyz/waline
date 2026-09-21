@@ -59,7 +59,7 @@ describe('private comment entry', () => {
       'config',
       'privateDraft',
       'savedEditor',
-      'alert',
+      'notify',
       'getVisibilityPolicy',
       `${code}; return { privateChoice, visibilityPolicy, onPrivateClick, editor };`,
     )(
