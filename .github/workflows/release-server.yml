@@ -114,23 +114,27 @@ jobs:
           tar --sort=name --mtime=@0 --owner=0 --group=0 --numeric-owner -czf tested-client.tar.gz -C client-dist .
           gh release upload "$VERSION" tested-client.tar.gz --clobber
 
-  docker:
-    name: Build and publish Docker image
+  docker-platform:
+    name: Build Docker image (${{ matrix.arch }})
     needs: build
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
     permissions:
       contents: read
       packages: write
       actions: write
-    outputs:
-      digest: ${{ steps.publish.outputs.digest }}
     steps:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - uses: docker/setup-qemu-action@v4
-        with:
-          cache-image: false
       - uses: docker/setup-buildx-action@v4
       - uses: docker/login-action@v4
         with:
@@ -151,12 +155,47 @@ jobs:
         with:
           context: .
           file: packages/server/Dockerfile.fork
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/${{ matrix.arch }}
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
+          tags: ghcr.io/zhangyxxyz/waline:sha-${{ github.sha }}-${{ matrix.arch }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha,scope=waline-fork
-          cache-to: type=gha,mode=max,scope=waline-fork
+          cache-from: |
+            type=gha,scope=waline-fork-${{ matrix.arch }}
+            type=gha,scope=waline-fork
+          cache-to: type=gha,mode=max,scope=waline-fork-${{ matrix.arch }}
+
+  docker:
+    name: Publish multi-platform Docker image
+    needs: docker-platform
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      actions: write
+    outputs:
+      digest: ${{ steps.publish.outputs.digest }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Merge native platform images
+        id: publish
+        env:
+          IMAGE: ghcr.io/zhangyxxyz/waline
+          VERSION: ${{ github.ref_name }}
+          SOURCE: ${{ github.sha }}
+        run: |
+          docker buildx imagetools create --tag "$IMAGE:$VERSION" --tag "$IMAGE:sha-$SOURCE" \
+            "$IMAGE:sha-$SOURCE-amd64" "$IMAGE:sha-$SOURCE-arm64"
+          digest=$(docker buildx imagetools inspect "$IMAGE:$VERSION" | awk '/^Digest:/ {print $2}')
+          [[ "$digest" =~ ^sha256:[a-f0-9]{64}$ ]]
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
       - name: Record deployment reference
         env:
           DIGEST: ${{ steps.publish.outputs.digest }}
@@ -274,6 +313,7 @@ jobs:
 
           ### Deployment
           After migration 001, apply assets/migrations/002-visibility-edit.mysql.sql before starting this release. It records privacy provenance; historical private messages remain locked.
+          Apply assets/migrations/003-normalize-unpinned.mysql.sql to normalize historical NULL sticky flags and default new comments to 0, preserving chronological sorting.
           Back up the database before applying assets/migrations/001-private-replies.mysql.sql on an existing installation. Skip this migration if it has already been applied.
           Do not roll back to a server that ignores visibility fields after private replies have been created.
           Persist /app/runtime using a writable host mount so dashboard region settings survive container recreation. Saved dashboard settings override environment defaults.
