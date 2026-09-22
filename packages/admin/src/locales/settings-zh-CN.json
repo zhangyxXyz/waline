@@ -1,15 +1,13 @@
 {
   "levels.colors": "等级颜色",
   "levels.colorsHint": "颜色留空使用默认样式；客户端配置按字段优先覆盖这里的颜色。亮色、暗色模式分别设置。",
-  "badgeColors": {
-    "hint": "颜色留空使用默认样式；客户端配置按字段优先覆盖这里的颜色。清空标签名称可移除标签。",
-    "light": "亮色模式",
-    "dark": "暗色模式",
-    "text": "文字",
-    "background": "背景",
-    "border": "边框",
-    "default": "默认"
-  },
+  "badgeColors.hint": "颜色留空使用默认样式；客户端配置按字段优先覆盖这里的颜色。清空标签名称可移除标签。",
+  "badgeColors.light": "亮色模式",
+  "badgeColors.dark": "暗色模式",
+  "badgeColors.text": "文字",
+  "badgeColors.background": "背景",
+  "badgeColors.border": "边框",
+  "badgeColors.default": "默认",
   "mail.smtp": "SMTP 配置",
   "smtp.tip": "用于回复通知、站长通知、注册验证和密码重置邮件。保存后新邮件立即使用该配置。密码仅保存在服务端，不回显；本页保存不会发送测试邮件。",
   "smtp.useEnvironment": "使用服务器环境变量配置",
