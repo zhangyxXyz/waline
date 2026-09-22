@@ -66,6 +66,8 @@ export const getConfig = ({
   path = location.pathname,
   lang = typeof navigator === 'undefined' ? 'en-US' : navigator.language,
   locale,
+  levelColors = {},
+  labelColors = {},
   meta = ['nick', 'mail', 'link'],
   requiredMeta = [],
   dark = false,
@@ -108,6 +110,8 @@ export const getConfig = ({
   turnstileKey,
   ...more,
   localeOverrides: typeof locale === 'object' && locale ? { ...locale } : {},
+  levelColors,
+  labelColors,
   // oxlint-disable-next-line typescript/strict-boolean-expressions, typescript/prefer-nullish-coalescing
   reaction: reaction === true ? DEFAULT_REACTION : reaction || null,
   imageUploader: withFallback(imageUploader, defaultUploadImage),

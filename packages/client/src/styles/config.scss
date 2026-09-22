@@ -1,4 +1,7 @@
 :root {
+  // Empty / invalid tokens select the active palette without JavaScript observers.
+  --waline-badge-light: initial;
+  --waline-badge-dark: ;
   // font-size
   --waline-font-size: 1rem;
 

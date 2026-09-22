@@ -3,6 +3,7 @@ const levelSettings = require('../service/level-settings.js');
 const regionSettings = require('../service/region-settings.js');
 const regionDatabase = require('../service/region-database.js');
 const dashboard = require('../service/dashboard-settings.js');
+const badgeColors = require('../service/badge-colors.js');
 
 const currentRegionSettings = () =>
   regionSettings.read({
@@ -57,6 +58,7 @@ const formatCmt = async (
     comment.link = user.url;
     comment.type = user.type;
     comment.label = user.label;
+    comment.labelColors = badgeColors.read(user.objectId, user.label);
   }
 
   const avatarUrl = user?.avatar || (await think.service('avatar').stringify(comment));
@@ -148,7 +150,19 @@ module.exports = class CommentController extends BaseRest {
         if (author) Object.assign(where, authorWhere(author));
         const total = await this.modelInstance.count(where);
         const items = await this.modelInstance.select(where, {
-          field: ['url', 'nick', 'insertedAt', 'mail', 'user_id'],
+          field: [
+            'url',
+            'nick',
+            'insertedAt',
+            'mail',
+            'user_id',
+            'comment',
+            'link',
+            'ua',
+            'ip',
+            'status',
+            'visibility',
+          ],
           order: [
             { field: 'insertedAt', direction: 'desc' },
             { field: 'objectId', direction: 'desc' },
@@ -183,7 +197,8 @@ module.exports = class CommentController extends BaseRest {
             'user_id',
             'url',
             'insertedAt',
-            ...(this.get('type') === 'statistics' ? ['ip'] : []),
+            'ip',
+            ...(this.get('type') === 'statistics-comments' ? ['comment', 'link', 'ua'] : []),
             'status',
             ...(this.config('storage') === 'mysql' ? ['visibility'] : []),
           ],
@@ -253,23 +268,84 @@ module.exports = class CommentController extends BaseRest {
   }
 
   async statisticsAvatars(result, rows) {
-    const { withAvatars } = require('../service/comment-statistics.js');
     const ids = new Set(result.items.map((item) => item.id));
     const selected = rows.filter((row) => ids.has(String(row.objectId)));
     const userIds = [...new Set(selected.map((row) => row.user_id).filter(Boolean))];
     const users = userIds.length
       ? await this.getModel('Users').select(
           { objectId: ['IN', userIds] },
-          { field: ['display_name', 'email', 'avatar'] },
+          { field: ['display_name', 'email', 'avatar', 'url', 'type', 'label'] },
         )
       : [];
-    return withAvatars(
-      result,
-      selected,
-      users,
-      (comment) => think.service('avatar').stringify(comment),
-      this.config('avatarProxy'),
+    const levels = levelSettings.read(this.config('levels'));
+    if (levels.enabled && selected.length) {
+      const conditions = {};
+      if (userIds.length) conditions.user_id = ['IN', userIds];
+      const mails = [...new Set(selected.map((row) => row.mail).filter(Boolean))];
+      if (mails.length) conditions.mail = ['IN', mails];
+      const counts = Object.keys(conditions).length
+        ? await this.modelInstance.count(
+            {
+              status: ['NOT IN', ['waiting', 'spam']],
+              ...(this.config('storage') === 'mysql' ? { visibility: 'public' } : {}),
+              _complex: { ...conditions, _logic: 'or' },
+            },
+            { group: ['user_id', 'mail'] },
+          )
+        : [];
+      levelSettings.apply(selected, counts || [], levels);
+    }
+    const formatted = new Map(
+      await Promise.all(
+        selected.map(async (row) => {
+          // Deliberately format as a visitor even if the caller is an administrator.
+          const value = await formatCmt(
+            { ...row, mail: row.mail || '', comment: row.comment || '', ua: row.ua || '' },
+            this.config(),
+            {},
+            users,
+          );
+          return [String(row.objectId), value];
+        }),
+      ),
     );
+    return {
+      ...result,
+      items: result.items.map((item) => {
+        const value = formatted.get(item.id);
+        if (!value) return item;
+        // Explicit public field allowlist: never expose mail, IP, IDs or private state.
+        const {
+          nick,
+          avatar,
+          link,
+          comment,
+          label,
+          labelColors,
+          level,
+          levelLabel,
+          addr,
+          browser,
+          os,
+          type,
+        } = value;
+        return {
+          ...item,
+          nick,
+          avatar,
+          link,
+          comment,
+          label,
+          labelColors,
+          level,
+          levelLabel,
+          addr,
+          browser,
+          os,
+          type,
+        };
+      }),
+    };
   }
 
   async getRegionAudit() {

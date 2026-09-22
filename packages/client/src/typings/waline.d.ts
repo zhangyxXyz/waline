@@ -1,3 +1,4 @@
+import type { WalineBadgeColors } from './badge.js';
 import type {
   WalineCommentSorting,
   WalineEmojiInfo,
@@ -12,6 +13,10 @@ import type {
 import type { WalineLocale } from './locale.js';
 
 export interface WalineProps {
+  /** Optional level0..level19 colors. Unset fields retain default badge styling. */
+  levelColors?: Record<string, WalineBadgeColors>;
+  /** Exclusive-label colors keyed by exact label text; override server colors. */
+  labelColors?: Record<string, WalineBadgeColors>;
   /**
    * Waline 的服务端地址
    *

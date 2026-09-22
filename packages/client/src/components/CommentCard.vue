@@ -5,6 +5,7 @@ import { computed, inject } from 'vue';
 
 import { useLikeStorage, useUserInfo } from '../composables/index.js';
 import { configKey } from '../config/index.js';
+import { getBadgeStyle } from '../utils/badge.js';
 import { getTimeAgo, isLinkHttp } from '../utils/index.js';
 import { getLevelLabel } from '../utils/level.js';
 import CommentBox from './CommentBox.vue';
@@ -50,7 +51,18 @@ const now = useNow();
 const userInfo = useUserInfo();
 
 const locale = computed(() => config.value.locale);
-const levelLabel = computed(() => getLevelLabel(comment, locale.value, config.value.localeOverrides));
+const levelLabel = computed(() =>
+  getLevelLabel(comment, locale.value, config.value.localeOverrides),
+);
+const levelStyle = computed(() => getBadgeStyle(config.value.levelColors[`level${comment.level}`]));
+const labelStyle = computed(() =>
+  getBadgeStyle(
+    comment.label && Object.hasOwn(config.value.labelColors, comment.label)
+      ? config.value.labelColors[comment.label]
+      : undefined,
+    comment.labelColors,
+  ),
+);
 
 const link = computed(() => {
   const { link } = comment;
@@ -87,6 +99,7 @@ const isEditingCurrent = computed(() => comment.objectId === edit?.objectId);
           v-if="link"
           class="wl-nick"
           :href="link"
+          :title="link"
           target="_blank"
           rel="ugc nofollow noreferrer noopener"
           >{{ comment.nick }}</a
@@ -97,13 +110,14 @@ const isEditingCurrent = computed(() => comment.objectId === edit?.objectId);
         <span v-if="comment.visibility === 'private'" class="wl-badge">{{
           locale.privateReply
         }}</span>
-        <span v-if="comment.label" class="wl-badge" v-text="comment.label" />
+        <span v-if="comment.label" class="wl-badge" :style="labelStyle" v-text="comment.label" />
 
         <span v-if="comment['sticky']" class="wl-badge" v-text="locale.sticky" />
 
         <span
           v-if="typeof comment.level === 'number'"
           :class="`wl-badge level${comment.level}`"
+          :style="levelStyle"
           v-text="levelLabel"
         />
 

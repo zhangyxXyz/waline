@@ -1,5 +1,6 @@
 const BaseRest = require('./rest.js');
 const dashboard = require('../service/dashboard-settings.js');
+const badgeColors = require('../service/badge-colors.js');
 
 module.exports = class UserController extends BaseRest {
   constructor(...args) {
@@ -25,7 +26,10 @@ module.exports = class UserController extends BaseRest {
         return this.success();
       }
 
-      return this.success(user[0]);
+      return this.success({
+        ...user[0],
+        labelColors: badgeColors.read(user[0].objectId, user[0].label),
+      });
     }
 
     const count = await this.modelInstance.count({});
@@ -48,6 +52,7 @@ module.exports = class UserController extends BaseRest {
 
         return {
           ...user,
+          labelColors: badgeColors.read(user.objectId, user.label),
           avatar: user.avatar,
         };
       }),
@@ -133,11 +138,16 @@ module.exports = class UserController extends BaseRest {
   }
 
   async putAction() {
-    const { display_name, url, avatar, password, type, label, email } = this.post();
+    const { display_name, url, avatar, password, type, label, email, labelColors } = this.post();
     const { objectId } = this.ctx.state.userInfo;
     const twoFactorAuth = this.post('2fa');
 
     const updateData = {};
+    if (label !== undefined || labelColors !== undefined) {
+      if (this.ctx.state.userInfo.type !== 'administrator') return this.ctx.throw(403);
+      if (typeof label !== 'string' || label.length > 100) return this.ctx.throw(400);
+      if (labelColors !== undefined) badgeColors.validate(labelColors);
+    }
 
     if (this.id && type) {
       updateData.type = type;
@@ -199,6 +209,9 @@ module.exports = class UserController extends BaseRest {
     await this.modelInstance.update(updateData, {
       objectId: this.id || objectId,
     });
+    if (labelColors !== undefined || label === '') {
+      badgeColors.save(this.id || objectId, label, labelColors ?? {});
+    }
 
     return this.success();
   }

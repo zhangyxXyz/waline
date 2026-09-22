@@ -97,6 +97,11 @@ describe('comment count API', () => {
         status: 'approved',
         visibility: 'public',
         url: '/guestbook/',
+        comment: '**Hello** from the comment',
+        link: 'https://example.test/',
+        mail: 'hidden@example.test',
+        ip: '',
+        ua: 'Mozilla/5.0',
         insertedAt: '2026-01-01',
       })),
     );
@@ -107,6 +112,12 @@ describe('comment count API', () => {
     expect(body.data.page).toBe(2);
     expect(body.data.total).toBe(25);
     expect(body.data.items).toHaveLength(5);
+    expect(body.data.items[0].comment).toContain('<strong>Hello</strong>');
+    expect(body.data.items[0].link).toBe('https://example.test/');
+    expect(body.data.items[0].avatar).toMatch(/^https:/u);
+    expect(JSON.stringify(body.data.items)).not.toMatch(
+      /hidden@example|"mail"|"ip"|"user_id"|"orig"/u,
+    );
     const invalid = await fetch(
       `http://localhost:${port}/api/comment?type=statistics-comments&page=0`,
     ).then((response) => response.json());

@@ -1,4 +1,13 @@
 {
+  "badgeColors": {
+    "hint": "Leave colors empty to use defaults. Client colors override these settings, field by field. Clear the label to remove it.",
+    "light": "Light mode",
+    "dark": "Dark mode",
+    "text": "Text",
+    "background": "Background",
+    "border": "Border",
+    "default": "Default"
+  },
   "mail.smtp": "SMTP settings",
   "smtp.tip": "Used for reply and site-owner notifications, registration verification and password resets. New messages use saved settings immediately. Passwords stay on the server and are never returned. Saving does not send a test message.",
   "smtp.useEnvironment": "Use server environment settings",

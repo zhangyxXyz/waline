@@ -152,6 +152,11 @@ export interface BaseWalineResponseComment {
    * 用户标签
    */
   label?: string;
+  /** Administrator-defined exclusive-label colors, optionally overridden by the client. */
+  labelColors?: {
+    light?: { text?: string; background?: string; border?: string };
+    dark?: { text?: string; background?: string; border?: string };
+  };
 
   /**
    * Comment status

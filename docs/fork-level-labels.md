@@ -18,3 +18,31 @@ Docker 部署需要持久化并允许 node 用户写入 `/app/runtime`。
 
 等级设置与 IP 管理新增文案均走管理端语言资源。提供简体中文、繁体中文及英文，
 其他管理端语言在这些新增项上回退英文。用户填写的标签文本不受后台语言切换影响。
+
+## 标签颜色
+
+客户端原生支持 `levelColors`（键为 `level0` 至 `level19`）和 `labelColors`
+（键为专属标签的完整文字）。每项包含 `light`、`dark`，各自可配置 `text`、
+`background`、`border`，使用 3/4/6/8 位十六进制颜色。未设置保持默认外观。
+
+```js
+init({
+  serverURL: 'https://comments.example.com',
+  levelColors: { level0: { light: { text: '#347d83' }, dark: { text: '#9ad5ce' } } },
+  labelColors: { 特邀嘉宾: { light: { text: '#81603a', background: '#faf0df' } } },
+});
+```
+
+后台「用户 → 设置专属标签」支持名称及亮色/暗色的文字、背景、边框色。
+颜色字段留空恢复默认；名称留空移除标签。仅管理员可修改专属标签和颜色。
+颜色按用户 ID 与标签文字保存在持久化的 `runtime/dashboard-settings.json`
+（或 `DASHBOARD_SETTINGS_FILE` 指定文件），不增加用户数据库字段。
+迁移部署时须连同 runtime 配置备份；仅导出评论/用户数据库不包含这些颜色。
+
+每个字段的优先级：有效客户端配置 → 后台专属标签颜色 → 当前样式默认值。
+亮暗模式跟随原生 `dark` 配置，包括固定模式、自动跟随系统和 CSS 选择器。
+旧客户端忽略服务端 `labelColors`，继续显示原有标签。
+
+公开统计评论列表现在返回正文 HTML、公开头像/站点、标签/等级、访客精度的属地与
+浏览器/系统字段。只处理公开且通过审核的评论，并通过字段白名单排除邮箱、原始 IP、
+账号 ID 和私密状态；管理员请求也按访客精度返回。

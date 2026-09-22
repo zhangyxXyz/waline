@@ -6,6 +6,7 @@ import { useSelector } from 'react-redux';
 import Header from '../../components/Header.jsx';
 // oxlint-disable-next-line import/no-namespace
 import * as Icons from '../../components/icon';
+import LabelEditor from '../../components/LabelEditor.jsx';
 import Paginator from '../../components/Paginator.jsx';
 import ServiceSettings from '../../components/ServiceSettings.jsx';
 import { getUserList, updateUser, deleteUser } from '../../services/user.js';
@@ -15,6 +16,7 @@ export default function User() {
   const currentUser = useSelector((state) => state.user);
   const { t } = useTranslation();
   const [panel, setPanel] = useState('users');
+  const [editingLabel, setEditingLabel] = useState(null);
   const [list, setList] = useState({
     page: 1,
     totalPages: 0,
@@ -71,14 +73,7 @@ export default function User() {
         async action(event) {
           event.preventDefault();
 
-          const label = prompt(t('please enter an exclusive label'));
-
-          await updateUser({
-            id: user.objectId,
-            label,
-          });
-          user.label = label;
-          setList({ ...list });
+          setEditingLabel(user);
         },
       },
       {
@@ -136,6 +131,20 @@ export default function User() {
             <h2>{t(panel === 'auth' ? 'settings.auth' : 'manage users')}</h2>
           </div>
           {panel === 'auth' && <ServiceSettings section="auth" />}
+          {panel === 'users' && editingLabel && (
+            <LabelEditor
+              key={editingLabel.objectId}
+              user={editingLabel}
+              onCancel={() => setEditingLabel(null)}
+              onSave={(user) => {
+                setList((current) => ({
+                  ...current,
+                  data: current.data.map((item) => (item.objectId === user.objectId ? user : item)),
+                }));
+                setEditingLabel(null);
+              }}
+            />
+          )}
           <main className="row typecho-page-main" hidden={panel !== 'users'}>
             <div className="col-mb-12 typecho-list">
               <form method="post" name="manage_comments" className="operate-form">
