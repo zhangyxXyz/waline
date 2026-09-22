@@ -13,6 +13,15 @@ const rows = [
 ];
 let writes = 0;
 const model = {
+  async withCounterTransaction(run) {
+    const before = rows.map((row) => ({ ...row }));
+    try {
+      return await run({ ...model, inCounterTransaction: true });
+    } catch (err) {
+      rows.splice(0, rows.length, ...before);
+      throw err;
+    }
+  },
   select: async (where = {}) =>
     rows.filter((row) =>
       Object.entries(where).every(
@@ -89,8 +98,9 @@ describe('visit management and public pageview API', () => {
   });
 
   it('recognizes alternative loopback forms', () => {
-    for (const origin of ['http://2130706433', 'http://127.1', 'http://[::ffff:127.0.0.1]'])
-      {expect(loopback(origin)).toBe(true);}
+    for (const origin of ['http://2130706433', 'http://127.1', 'http://[::ffff:127.0.0.1]']) {
+      expect(loopback(origin)).toBe(true);
+    }
     expect(loopback('https://onlyzyx.com')).toBe(false);
   });
 
@@ -122,7 +132,29 @@ describe('visit management and public pageview API', () => {
         { url: '/a/', time: 1 },
         { url: '/a/', time: 2 },
       ],
-    ])
-      {expect(() => visits.validate(items)).toThrow(/Invalid|Duplicate/);}
+    ]) {
+      expect(() => visits.validate(items)).toThrow(/Invalid|Duplicate/);
+    }
+  });
+
+  it('passes the storage adapter order contract to snapshots', async () => {
+    const { normalizeOrder, toSqlOrder } = require('../src/service/storage/order.js');
+    await visits.snapshot({
+      select: async (_where, options) => {
+        expect(toSqlOrder(normalizeOrder(options.order))).toStrictEqual({ url: 'ASC' });
+        return [];
+      },
+    });
+  });
+
+  it('commits increments before ThinkJS sends the successful response', async () => {
+    const before = rows.find((row) => row.url === '/a/').time;
+    const result = await fetch(`${base}/article`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path: '/a/', type: 'time' }),
+    }).then((response) => response.json());
+    expect(result.data).toStrictEqual([{ time: before + 1 }]);
+    expect(rows.find((row) => row.url === '/a/').time).toBe(before + 1);
   });
 });

@@ -79,26 +79,35 @@ module.exports = class extends BaseRest {
     if (
       (this.post('type') || 'time') === 'time' &&
       (isLoopback(this.ctx.get('Origin')) || isLoopback(this.ctx.get('Referer')))
-    )
-      {return this.ctx.throw(403);}
+    ) {
+      return this.ctx.throw(403);
+    }
+    let data;
     if (this.modelInstance.withCounterTransaction && !this.modelInstance.inCounterTransaction) {
-      return this.modelInstance.withCounterTransaction(async (scoped) => {
+      data = await this.modelInstance.withCounterTransaction(async (scoped) => {
         const original = this.modelInstance;
         this.modelInstance = scoped;
         try {
-          return await this.postAction();
+          return await this.updateCounter();
         } finally {
           this.modelInstance = original;
         }
       });
+    } else {
+      data = await this.updateCounter();
     }
+    // success() interrupts ThinkJS execution; send only after the transaction commits.
+    return this.jsonOrSuccess(data);
+  }
+
+  async updateCounter() {
     const { path, type, action } = this.post();
     const resp = await this.modelInstance.select({ url: path });
     const { deprecated } = this.ctx.state;
 
     if (think.isEmpty(resp)) {
       if (action === 'desc') {
-        return this.jsonOrSuccess(deprecated ? 0 : [0]);
+        return deprecated ? 0 : [0];
       }
 
       const count = 1;
@@ -108,7 +117,7 @@ module.exports = class extends BaseRest {
         { access: { read: true, write: true } },
       );
 
-      return this.jsonOrSuccess(deprecated ? count : [{ [type]: count }]);
+      return deprecated ? count : [{ [type]: count }];
     }
 
     const ret = await this.modelInstance.update(
@@ -119,6 +128,6 @@ module.exports = class extends BaseRest {
       { objectId: ['IN', resp.map(({ objectId }) => objectId)] },
     );
 
-    return this.jsonOrSuccess(deprecated ? ret[0][type] : [{ [type]: ret[0][type] }]);
+    return deprecated ? ret[0][type] : [{ [type]: ret[0][type] }];
   }
 };
