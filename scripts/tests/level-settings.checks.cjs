@@ -15,6 +15,39 @@ const example = {
   ],
 };
 
+test('level colors persist, follow thresholds, clear and reject unsafe input', (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'waline-level-colors-'));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const file = path.join(directory, 'settings.json');
+  const colors = { light: { text: '#abc', background: '#123456' }, dark: { text: '#aabbccdd' } };
+  const value = { enabled: true, levels: [{ min: 0, label: '', colors }] };
+  settings.write(value, file);
+  assert.deepEqual(settings.read(false, file), value);
+  const comments = [{}];
+  settings.apply(comments, [], value);
+  assert.deepEqual(comments[0].levelColors, colors);
+  settings.apply(comments, [], example);
+  assert.equal(comments[0].levelColors, undefined);
+  settings.apply(comments, [], value);
+  settings.apply(comments, [], { ...value, enabled: false });
+  assert.equal(comments[0].levelColors, undefined);
+  assert.throws(() =>
+    settings.write(
+      {
+        ...value,
+        levels: [{ min: 0, label: '', colors: { light: { text: 'url(https://example.com)' } } }],
+      },
+      file,
+    ),
+  );
+  assert.deepEqual(settings.read(false, file), value);
+  const cleared = settings.write(
+    { ...value, levels: [{ min: 0, label: '', colors: { light: { text: '' } } }] },
+    file,
+  );
+  assert.deepEqual(cleared.levels[0].colors, { light: {} });
+});
+
 test('client labels preserve explicit overrides and localized defaults', async () => {
   const { getLevelLabel } = await import('../../packages/client/src/utils/level.ts');
   const comment = { level: 0, levelLabel: 'Server label' };

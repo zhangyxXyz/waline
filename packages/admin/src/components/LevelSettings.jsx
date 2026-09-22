@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import request from '../utils/request.js';
+import BadgeColors from './BadgeColors.jsx';
 
 export default function LevelSettings() {
   const { t } = useTranslation();
@@ -73,51 +74,60 @@ export default function LevelSettings() {
             </label>
             <div className="waline-level-rows">
               {settings.levels.map((row, index) => (
-                <div className="waline-level-row" key={index}>
-                  <span>{t('levels.number', { number: index })}</span>
-                  <label>
-                    {t('levels.minimum')}
-                    <input
-                      type="number"
-                      min="0"
-                      max="1000000000"
-                      step="1"
-                      required
-                      value={row.min}
-                      readOnly={index === 0}
-                      onChange={(event) =>
-                        update(
-                          index,
-                          'min',
-                          event.target.value === '' ? '' : Number(event.target.value),
-                        )
+                <div key={index}>
+                  <div className="waline-level-row">
+                    <span>{t('levels.number', { number: index })}</span>
+                    <label>
+                      {t('levels.minimum')}
+                      <input
+                        type="number"
+                        min="0"
+                        max="1000000000"
+                        step="1"
+                        required
+                        value={row.min}
+                        readOnly={index === 0}
+                        onChange={(event) =>
+                          update(
+                            index,
+                            'min',
+                            event.target.value === '' ? '' : Number(event.target.value),
+                          )
+                        }
+                      />
+                    </label>
+                    <label>
+                      {t('levels.label')}
+                      <input
+                        type="text"
+                        maxLength="40"
+                        value={row.label}
+                        placeholder={t('levels.placeholder')}
+                        onChange={(event) => update(index, 'label', event.target.value)}
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      className="btn"
+                      disabled={index === 0}
+                      aria-label={t('levels.removeNumber', { number: index })}
+                      onClick={() =>
+                        setSettings({
+                          ...settings,
+                          levels: settings.levels.filter((_, position) => position !== index),
+                        })
                       }
+                    >
+                      {t('levels.remove')}
+                    </button>
+                  </div>
+                  <details>
+                    <summary>{t('levels.colors')}</summary>
+                    <BadgeColors
+                      colors={row.colors}
+                      onChange={(colors) => update(index, 'colors', colors)}
                     />
-                  </label>
-                  <label>
-                    {t('levels.label')}
-                    <input
-                      type="text"
-                      maxLength="40"
-                      value={row.label}
-                      placeholder={t('levels.placeholder')}
-                      onChange={(event) => update(index, 'label', event.target.value)}
-                    />
-                  </label>
-                  <button
-                    type="button"
-                    className="btn"
-                    disabled={index === 0}
-                    aria-label={t('levels.removeNumber', { number: index })}
-                    onClick={() =>
-                      setSettings({
-                        ...settings,
-                        levels: settings.levels.filter((_, position) => position !== index),
-                      })
-                    }
-                  >
-                    {t('levels.remove')}
-                  </button>
+                  </details>
                 </div>
               ))}
             </div>

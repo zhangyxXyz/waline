@@ -21,6 +21,11 @@ Docker 部署需要持久化并允许 node 用户写入 `/app/runtime`。
 
 ## 标签颜色
 
+后台「等级标签」每档可展开「等级颜色」，分别设置亮色/暗色的文字、背景和边框。
+颜色随等级门槛保存在 `runtime/level-settings.json`，旧配置无需迁移。
+客户端 `levelColors.levelN` 按字段优先覆盖后台颜色，未配置时使用后台颜色或默认样式。
+普通评论和公开统计列表均返回 `levelColors`；关闭等级后不返回等级及颜色。
+
 客户端原生支持 `levelColors`（键为 `level0` 至 `level19`）和 `labelColors`
 （键为专属标签的完整文字）。每项包含 `light`、`dark`，各自可配置 `text`、
 `background`、`border`，使用 3/4/6/8 位十六进制颜色。未设置保持默认外观。

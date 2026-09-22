@@ -145,6 +145,11 @@ export interface BaseWalineResponseComment {
   level?: number;
   /** Level label configured by the server administrator. */
   levelLabel?: string;
+  /** Server level colors; individual client fields take priority. */
+  levelColors?: {
+    light?: { text?: string; background?: string; border?: string };
+    dark?: { text?: string; background?: string; border?: string };
+  };
 
   /**
    * User label

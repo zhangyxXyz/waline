@@ -54,7 +54,9 @@ const locale = computed(() => config.value.locale);
 const levelLabel = computed(() =>
   getLevelLabel(comment, locale.value, config.value.localeOverrides),
 );
-const levelStyle = computed(() => getBadgeStyle(config.value.levelColors[`level${comment.level}`]));
+const levelStyle = computed(() =>
+  getBadgeStyle(config.value.levelColors[`level${comment.level}`], comment.levelColors),
+);
 const labelStyle = computed(() =>
   getBadgeStyle(
     comment.label && Object.hasOwn(config.value.labelColors, comment.label)

@@ -1,4 +1,6 @@
 {
+  "levels.colors": "Level colors",
+  "levels.colorsHint": "Leave colors empty for default styles. Client settings override individual fields. Configure light and dark modes separately.",
   "badgeColors": {
     "hint": "Leave colors empty to use defaults. Client colors override these settings, field by field. Clear the label to remove it.",
     "light": "Light mode",

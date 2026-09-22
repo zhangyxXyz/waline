@@ -288,6 +288,7 @@ jobs:
           This version tag is intentionally reused for this update. Pin the client SHA-256 and image digest to identify the exact build.
 
           ### Features
+          - Each dashboard level supports optional light/dark text, background and border colors. Client levelColors overrides individual fields; existing level settings need no migration.
           - Comment visibility editing checks ownership, provenance and the reply tree on the server; the client explains denied changes and keeps edit drafts in memory.
           - Administrators can create administrator-only private roots and privately reply to account-owned comments. Private root replies retain administrator-only access, including after the original author loses the role.
           - Image upload dashboard switch controls the matching client's button, paste and drag-and-drop tools; manual image URLs and existing images remain unaffected.

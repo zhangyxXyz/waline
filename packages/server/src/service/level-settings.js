@@ -1,6 +1,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { randomUUID } = require('node:crypto');
+const badgeColors = require('./badge-colors.js');
 
 const filename = () =>
   process.env.LEVEL_SETTINGS_FILE || path.resolve(__dirname, '../../runtime/level-settings.json');
@@ -13,7 +14,7 @@ const validate = (value) => {
     value.levels.length < 1 ||
     value.levels.length > 20
   )
-    throw invalid();
+    {throw invalid();}
   let previous = -1;
   const levels = value.levels.map((row, index) => {
     if (
@@ -25,11 +26,17 @@ const validate = (value) => {
       (index === 0 && row.min !== 0) ||
       typeof row.label !== 'string' ||
       row.label.trim().length > 40 ||
-      /[\u0000-\u001f\u007f]/u.test(row.label)
+      // Reject control characters in administrator-supplied label text.
+      // eslint-disable-next-line no-control-regex
+      /[\u0000-\u001F\u007F]/u.test(row.label)
     )
-      throw invalid();
+      {throw invalid();}
     previous = row.min;
-    return { min: row.min, label: row.label.trim() };
+    return {
+      min: row.min,
+      label: row.label.trim(),
+      ...(row.colors === undefined ? {} : { colors: badgeColors.validate(row.colors) }),
+    };
   });
   return { enabled: value.enabled, levels };
 };
@@ -49,9 +56,9 @@ const defaults = (thresholds) =>
 const read = (thresholds, file = filename()) => {
   try {
     return validate(JSON.parse(fs.readFileSync(file, 'utf8')));
-  } catch (error) {
-    if (error.code === 'ENOENT') return defaults(thresholds);
-    throw error;
+  } catch (err) {
+    if (err.code === 'ENOENT') return defaults(thresholds);
+    throw err;
   }
 };
 
@@ -72,6 +79,7 @@ const apply = (comments, counts, settings) => {
   for (const comment of comments) {
     delete comment.level;
     delete comment.levelLabel;
+    delete comment.levelColors;
     if (!settings.enabled) continue;
     // A signed-in user may have used several email addresses over time.
     const count = counts.reduce((total, row) => {
@@ -82,8 +90,10 @@ const apply = (comments, counts, settings) => {
     }, 0);
     const index = settings.levels.findLastIndex(({ min }) => min <= count);
     comment.level = Math.max(0, index);
-    const label = settings.levels[comment.level].label;
+    const {label} = settings.levels[comment.level];
     if (label) comment.levelLabel = label;
+    const {colors} = settings.levels[comment.level];
+    if (colors) comment.levelColors = colors;
   }
 };
 
