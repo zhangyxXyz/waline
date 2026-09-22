@@ -157,4 +157,20 @@ describe('visit management and public pageview API', () => {
     expect(result.data).toStrictEqual([{ time: before + 1 }]);
     expect(rows.find((row) => row.url === '/a/').time).toBe(before + 1);
   });
+
+  it('allows loopback reads with a production-only domain allowlist', async () => {
+    think.config('secureDomains', ['onlyzyx.com']);
+    try {
+      for (const origin of [
+        'http://[::1]:4000',
+        'http://127.0.0.2:4000',
+        'http://preview.localhost',
+      ]) {
+        const response = await fetch(`${base}/article?site=1`, { headers: { Origin: origin } });
+        expect(response.status).toBe(200);
+      }
+    } finally {
+      think.config('secureDomains', null);
+    }
+  });
 });
