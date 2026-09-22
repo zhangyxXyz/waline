@@ -1,4 +1,5 @@
 const BaseRest = require('./rest.js');
+const { isLoopback } = require('../service/loopback.js');
 
 module.exports = class extends BaseRest {
   constructor(ctx) {
@@ -7,8 +8,16 @@ module.exports = class extends BaseRest {
   }
 
   async getAction() {
+    this.ctx.set('Cache-Control', 'no-store');
     const { path, type } = this.get();
     const { deprecated } = this.ctx.state;
+
+    if (this.get('site') === '1') {
+      const rows = await this.modelInstance.select({}, { field: ['time'] });
+      return this.success({
+        pageViews: rows.reduce((total, row) => total + (Number(row.time) || 0), 0),
+      });
+    }
 
     // path is required
     if (!Array.isArray(path) || path.length === 0) {
@@ -67,6 +76,22 @@ module.exports = class extends BaseRest {
   }
 
   async postAction() {
+    if (
+      (this.post('type') || 'time') === 'time' &&
+      (isLoopback(this.ctx.get('Origin')) || isLoopback(this.ctx.get('Referer')))
+    )
+      {return this.ctx.throw(403);}
+    if (this.modelInstance.withCounterTransaction && !this.modelInstance.inCounterTransaction) {
+      return this.modelInstance.withCounterTransaction(async (scoped) => {
+        const original = this.modelInstance;
+        this.modelInstance = scoped;
+        try {
+          return await this.postAction();
+        } finally {
+          this.modelInstance = original;
+        }
+      });
+    }
     const { path, type, action } = this.post();
     const resp = await this.modelInstance.select({ url: path });
     const { deprecated } = this.ctx.state;

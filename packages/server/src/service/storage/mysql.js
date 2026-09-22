@@ -4,6 +4,18 @@ const { readPredicate } = require('../comment-privacy.js');
 const visibilityEdit = require('../visibility-edit.js');
 
 module.exports = class extends Base {
+  async withCounterTransaction(run) {
+    if (this.inCounterTransaction) return run(this);
+    const transaction = this.model(this.tableName);
+    return transaction.transaction(async () => {
+      const scoped = Object.create(this);
+      scoped.inCounterTransaction = true;
+      scoped.model = (name) => this.model(name).db(transaction.db());
+      // Serialize counter imports, edits and increments, including absent URL keys.
+      await scoped.model(this.tableName).lock(true).select();
+      return run(scoped);
+    });
+  }
   async withThreadLock(id, run) {
     const transaction = this.model(this.tableName);
     return transaction.transaction(async () => {

@@ -55,6 +55,7 @@ export default function Header() {
 
   const navItems = [
     { to: '/ui', label: t('comment') },
+    { to: '/ui/visits', label: t('visits.title') },
     { to: '/ui/mail', label: t('mail.title') },
     { to: '/ui/user', label: t('user') },
     { to: '/ui/migration', label: t('migration') },

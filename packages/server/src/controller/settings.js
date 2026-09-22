@@ -2,6 +2,7 @@ const Base = require('./rest.js');
 const settings = require('../service/dashboard-settings.js');
 const mail = require('../service/mail-templates.js');
 const smtp = require('../service/smtp-settings.js');
+const visits = require('../service/visit-management.js');
 
 module.exports = class extends Base {
   check() {
@@ -11,6 +12,17 @@ module.exports = class extends Base {
   async getAction() {
     this.check();
     switch (this.get('section')) {
+      case 'visits': {
+        const all = await visits.snapshot(this.getModel('Counter'));
+        const query = String(this.get('search') || '').slice(0, 255);
+        const page = Math.max(1, Number.parseInt(this.get('page'), 10) || 1);
+        const filtered = all.filter((row) => row.url.includes(query));
+        return this.success({
+          total: filtered.length,
+          totalViews: all.reduce((sum, row) => sum + row.time, 0),
+          items: filtered.slice((page - 1) * 50, page * 50),
+        });
+      }
       case 'smtp': {
         return this.success(smtp.publicSettings());
       }
@@ -37,6 +49,14 @@ module.exports = class extends Base {
   async putAction() {
     this.check();
     switch (this.get('section')) {
+      case 'visits': {
+        return this.success(await visits.edit(this.getModel('Counter'), this.post()));
+      }
+      case 'visits-import': {
+        return this.success(
+          await visits.apply(this.getModel('Counter'), this.post('items'), this.post('token')),
+        );
+      }
       case 'smtp': {
         return this.success(smtp.save(this.post()));
       }
@@ -59,6 +79,8 @@ module.exports = class extends Base {
   }
   async postAction() {
     this.check();
+    if (this.get('section') === 'visits-preview')
+      {return this.success(await visits.preview(this.getModel('Counter'), this.post('items')));}
     if (this.get('section') === 'download-test') {
       return this.success(
         await require('../service/region-database.js').testConnection(this.post()),

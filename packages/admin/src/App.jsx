@@ -11,6 +11,7 @@ import Migration from './pages/migration/index.jsx';
 import Profile from './pages/profile/index.jsx';
 import Register from './pages/register/index.jsx';
 import User from './pages/user/index.jsx';
+import Visits from './pages/visits/index.jsx';
 import { store } from './store/index.js';
 
 export default function App() {
@@ -20,6 +21,14 @@ export default function App() {
     <Provider store={store}>
       <Router basename={basePath}>
         <Routes>
+          <Route
+            path="/ui/visits"
+            element={
+              <Access meta={{ auth: 'administrator' }}>
+                <Visits />
+              </Access>
+            }
+          />
           <Route
             path="/ui/mail"
             element={
