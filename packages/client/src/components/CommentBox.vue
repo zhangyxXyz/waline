@@ -42,6 +42,7 @@ import {
   parseMarkdown,
   userAgent,
 } from '../utils/index.js';
+import { restoreEmoji } from '../utils/restoreEmoji.js';
 import {
   CloseIcon,
   EmojiIcon,
@@ -644,7 +645,7 @@ watch(showGif, async (value) => {
 
 onMounted(() => {
   if (props.edit?.objectId) {
-    editor.value = props.edit.orig;
+    editor.value = restoreEmoji(props.edit.orig, emoji.value.map);
   }
 
   // watch editor
@@ -673,6 +674,10 @@ onMounted(() => {
     () => config.value.emoji,
     async (emojiConfig) => {
       emoji.value = await getEmojisInfo(emojiConfig);
+      // Loading the emoji catalog must not overwrite edits made in the meantime.
+      if (props.edit?.objectId && editor.value === props.edit.orig) {
+        editor.value = restoreEmoji(props.edit.orig, emoji.value.map);
+      }
     },
   );
 });

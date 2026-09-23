@@ -521,6 +521,7 @@ export default function ManageComments() {
                             avatar,
                             link,
                             comment,
+                            orig,
                             ip,
                             addr,
                             url,
@@ -598,7 +599,7 @@ export default function ManageComments() {
                                       id={`comment-${objectId}-text`}
                                       rows="6"
                                       className="w-90 mono"
-                                      defaultValue={comment}
+                                      defaultValue={orig ?? comment}
                                       onChange={(event) =>
                                         (editCommentRef.current.comment = event.target.value)
                                       }
