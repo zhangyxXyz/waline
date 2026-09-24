@@ -4,6 +4,14 @@
 
 # Waline
 
+## Seiun 分支发布与部署
+
+统一入口 `Release Waline` 支持选择 `client`、`admin`、`server` 或 `all`。
+评论客户端和管理后台分别发布带校验值的独立资源包，服务端发布双架构 Docker 镜像。
+仍使用一个服务器容器，后台可从持久化目录加载独立版本，缺失时回退到镜像内置版本。
+后台纯界面更新不再需要重建镜像。工作流职责、同 tag 发布、校验、部署和回退步骤见
+[发布与部署说明](.github/RELEASING.md)。
+
 ![作者](https://img.shields.io/badge/作者-lizheming,%20Mr.Hope-blue?style=for-the-badge) ![协议](https://img.shields.io/github/license/walinejs/waline?style=for-the-badge) [![qq](https://img.shields.io/badge/qq-waline交流群-f75137?logo=TencentQQ&style=for-the-badge)](https://jq.qq.com/?_wv=1027&k=bKoVBppG) [![telegram](https://img.shields.io/badge/telegram-walinejs-2ca5e0?logo=telegram&style=for-the-badge)](https://t.me/walinejs)
 
 ![npm version](https://img.shields.io/npm/v/@waline/client?color=critical&logo=npm&style=flat-square&label=@waline/client) ![npm bundle size (scoped)](https://img.shields.io/bundlephobia/minzip/@waline/client?style=flat-square&label=@waline/client%20size) ![downloads](https://img.shields.io/npm/dm/@waline/vercel?style=flat-square&label=@waline/client%20downloads) [![jsDelivr hits](https://data.jsdelivr.com/v1/package/npm/@waline/client/badge)](https://www.jsdelivr.com/package/npm/@waline/client)

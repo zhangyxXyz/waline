@@ -17,40 +17,10 @@ env:
 
 jobs:
   build:
-    name: Test and build
-    runs-on: ubuntu-latest
+    name: Validate Docker image
+    uses: ./.github/workflows/docker-test.yml
     permissions:
       contents: read
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          persist-credentials: false
-      - uses: docker/setup-buildx-action@v4
-      - name: Build and test tagged source
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          file: packages/server/Dockerfile.fork
-          platforms: linux/amd64
-          load: true
-          tags: waline-smoke:${{ github.sha }}
-          cache-from: type=gha,scope=waline-fork
-          cache-to: type=gha,mode=max,scope=waline-fork
-      - name: Smoke test packaged assets
-        env:
-          IMAGE: waline-smoke:${{ github.sha }}
-        shell: bash
-        run: |
-          container=$(docker run -d -e MYSQL_DB=smoke -e JWT_TOKEN=smoke-test "$IMAGE")
-          trap 'docker logs "$container"; docker rm -f "$container"' EXIT
-          docker exec "$container" node -e "const R=require('ip2region').default; const r=new R({ipv4db:'/app/data/ip2region-v4.db'}).search('43.132.141.24'); if(r.country!=='中国'||r.province!=='香港特别行政区')process.exit(1)"
-          for attempt in $(seq 1 30); do
-            if docker exec "$container" node -e "Promise.all(['waline.js','waline.css','waline-meta.css','admin.js'].map(async file => {const r=await fetch('http://localhost:8360/assets/fork/'+file);if(!r.ok || !(await r.text()).length)throw Error(file);})).catch(()=>process.exit(1))"; then
-              exit 0
-            fi
-            sleep 2
-          done
-          exit 1
 
   docker-platform:
     name: Build Docker image (${{ matrix.arch }})

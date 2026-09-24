@@ -1,47 +1,60 @@
 name: '[docker] CI for test'
 
 on:
+  workflow_call:
+  workflow_dispatch:
   pull_request:
-    branches:
-      - main
+    branches: [dev]
+    paths:
+      - 'packages/**'
+      - 'scripts/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - '.npmrc'
+      - '.dockerignore'
+      - '.github/workflows/**'
 
 permissions:
   contents: read
 
+env:
+  DOCKER_BUILD_RECORD_UPLOAD: 'false'
+
 jobs:
-  path-context:
-    if: github.repository == 'walinejs/waline'
+  build:
+    name: Build and smoke test fork image
+    if: github.repository == 'zhangyxXyz/waline'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
-
-      - name: Cache Docker layers
-        uses: actions/cache@v6
+      - uses: actions/checkout@v7
         with:
-          path: /tmp/.buildx-cache
-          key: ${{ runner.os }}-buildx-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-buildx-
-
-      - name: Build alpine
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@v4
+      - name: Build and test tagged source
         uses: docker/build-push-action@v7
         with:
-          file: ./packages/server/Dockerfile.alpine
-          platforms: linux/amd64,linux/arm64/v8
-          cache-from: type=local,src=/tmp/.buildx-cache
-          cache-to: type=local,dest=/tmp/.buildx-cache,mode=max
-
-      - name: Build debian
-        uses: docker/build-push-action@v7
-        with:
-          file: ./packages/server/Dockerfile
-          platforms: linux/amd64,linux/arm64/v8
-          cache-from: type=local,src=/tmp/.buildx-cache
-          cache-to: type=local,dest=/tmp/.buildx-cache,mode=max
+          context: .
+          file: packages/server/Dockerfile.fork
+          platforms: linux/amd64
+          load: true
+          tags: waline-smoke:${{ github.sha }}
+          cache-from: type=gha,scope=waline-fork
+          cache-to: type=gha,mode=max,scope=waline-fork
+      - name: Smoke test packaged assets
+        env:
+          IMAGE: waline-smoke:${{ github.sha }}
+        shell: bash
+        run: |
+          container=$(docker run -d -e MYSQL_DB=smoke -e JWT_TOKEN=smoke-test "$IMAGE")
+          trap 'docker logs "$container"; docker rm -f "$container"' EXIT
+          docker exec "$container" node -e "const R=require('ip2region').default; const r=new R({ipv4db:'/app/data/ip2region-v4.db'}).search('43.132.141.24'); if(r.country!=='中国'||r.province!=='香港特别行政区')process.exit(1)"
+          for attempt in $(seq 1 30); do
+            if docker exec "$container" node -e "Promise.all(['waline.js','waline.css','waline-meta.css','admin.js'].map(async file => {const r=await fetch('http://localhost:8360/assets/fork/'+file);if(!r.ok || !(await r.text()).length)throw Error(file);})).catch(()=>process.exit(1))"; then
+              exit 0
+            fi
+            sleep 2
+          done
+          exit 1

@@ -12,6 +12,15 @@
 
 A simple comment system with backend support.
 
+## Seiun fork releases
+
+This fork uses `Release Waline` to publish the client, admin, server, or all three.
+Client and admin releases are standalone archives with checksums; the server is
+a multi-platform Docker image. One server container can load independently
+updated admin assets from persistent storage, with its bundled admin as fallback.
+See [release workflows and deployment](.github/RELEASING.md) for component
+selection, same-tag updates, asset verification, deployment, and rollback.
+
 ---
 
 > [中文 README](https://github.com/walinejs/waline/blob/main/README_CN.md)

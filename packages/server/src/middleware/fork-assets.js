@@ -12,7 +12,18 @@ module.exports = () => async (ctx, next) => {
   const file = files[ctx.path];
   if (!file || !['GET', 'HEAD'].includes(ctx.method)) return next();
   const [name, type] = file;
-  const filename = path.join(think.ROOT_PATH, 'public', 'fork', name);
+  let filename = path.join(think.ROOT_PATH, 'public', 'fork', name);
+  // Only the fixed admin asset may be overridden. Resolve on every request so
+  // switching a release symlink takes effect without restarting the container.
+  if (name === 'admin.js' && process.env.WALINE_ADMIN_ASSET_DIR) {
+    const external = path.join(process.env.WALINE_ADMIN_ASSET_DIR, 'admin.js');
+    try {
+      const stat = fs.statSync(external);
+      if (stat.isFile() && stat.size > 0) filename = external;
+    } catch (err) {
+      if (!['ENOENT', 'ENOTDIR'].includes(err.code)) throw err;
+    }
+  }
   if (!fs.existsSync(filename)) return ctx.throw(404);
   ctx.type = type;
   ctx.set('Cache-Control', 'no-cache');
