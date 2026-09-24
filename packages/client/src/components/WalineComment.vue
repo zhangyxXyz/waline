@@ -6,6 +6,7 @@ import type { WalineComment, WalineCommentStatus, WalineRootComment } from '@wal
 import { deleteComment, getComment, updateComment } from '@waline/api';
 import { computed, onMounted, onUnmounted, provide, ref, watch } from 'vue';
 
+import { createDraftStore, draftStoreKey } from '../composables/drafts.js';
 import { useLikeStorage, useUserInfo } from '../composables/index.js';
 import { configKey, sortingMethods, sortKeyMap } from '../config/index.js';
 import type { WalineCommentSorting, WalineProps } from '../typings/index.js';
@@ -30,6 +31,14 @@ const page = ref(1);
 const totalPages = ref(0);
 
 const config = computed(() => getConfig(props as WalineProps));
+const draftStore = createDraftStore();
+provide(draftStoreKey, draftStore);
+watch(
+  () => [config.value.serverURL, config.value.path, userInfo.value.token],
+  () => draftStore.clear(),
+  { flush: 'sync' },
+);
+onUnmounted(() => draftStore.clear());
 
 const commentSortingRef = ref(config.value.commentSorting);
 
@@ -120,10 +129,12 @@ const onSortByChange = (item: WalineCommentSorting): void => {
 };
 
 const onReply = (comment: WalineComment | null): void => {
+  if (comment) edit.value = null;
   reply.value = comment;
 };
 
 const onEdit = (comment: WalineComment | null): void => {
+  if (comment) reply.value = null;
   edit.value = comment;
 };
 

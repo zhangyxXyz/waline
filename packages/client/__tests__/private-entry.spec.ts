@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 
 import { transpileModule, ScriptTarget } from 'typescript';
 import { describe, expect, it } from 'vitest';
-import { compile, createSSRApp, ref, computed, watch } from 'vue';
+import { compile, createSSRApp, ref, computed, watch, toRef, reactive } from 'vue';
 import { renderToString } from 'vue/server-renderer';
 
 // Render the actual client control, independently of any theme or live account.
@@ -61,6 +61,8 @@ describe('private comment entry', () => {
       'savedEditor',
       'notify',
       'getVisibilityPolicy',
+      'toRef',
+      'draft',
       `${code}; return { privateChoice, visibilityPolicy, onPrivateClick, editor };`,
     )(
       ref,
@@ -73,6 +75,8 @@ describe('private comment entry', () => {
       saved,
       (message: string) => alerts.push(message),
       () => Promise.reject(new Error('No network expected')),
+      toRef,
+      reactive({ privateSelected: false, visibility: 'private' }),
     );
     controls.visibilityPolicy.value = {
       public: { allowed: false, reason: 'visibilityOrigin' },

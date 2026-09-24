@@ -230,6 +230,7 @@ const isEditingCurrent = computed(() => comment.objectId === edit?.objectId);
         }"
       >
         <CommentBox
+          :key="`${isEditingCurrent ? 'edit' : 'reply'}:${comment.objectId}`"
           :edit="edit"
           :reply-id="reply?.objectId"
           :reply-user="comment.nick"

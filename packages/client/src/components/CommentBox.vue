@@ -19,10 +19,12 @@ import {
   onUnmounted,
   reactive,
   ref,
+  toRef,
   useTemplateRef,
   watch,
 } from 'vue';
 
+import { draftStoreKey } from '../composables/drafts.js';
 import {
   useEditor,
   useReCaptcha,
@@ -79,21 +81,34 @@ const notify = (message: string): void => config.value.notify(message);
 
 const savedEditor = useEditor();
 const userInfo = useUserInfo();
-// Private drafts stay in component memory; public drafts retain existing persistence.
-const privateDraft = ref('');
+// Keep each operation's draft in page memory, across editor remounts.
+const draftStore = inject(draftStoreKey, null);
+const draftKey = props.edit
+  ? `edit:${props.edit.objectId}`
+  : props.replyId
+    ? `reply:${props.replyId}`
+    : '';
+const restoredDraft = draftKey ? draftStore?.get(draftKey) : undefined;
+const draft = reactive(
+  restoredDraft || {
+    text: '',
+    privateSelected: false,
+    visibility: props.edit?.visibility || 'public',
+  },
+);
+if (draftKey) draftStore?.set(draftKey, draft);
+const privateDraft = toRef(draft, 'text');
 let unmounted = false;
 onUnmounted(() => {
   unmounted = true;
-  privateDraft.value = '';
 });
-const privateSelected = ref(false);
-const editVisibility = ref<'public' | 'private'>(props.edit?.visibility || 'public');
+const privateSelected = toRef(draft, 'privateSelected');
+const editVisibility = toRef(draft, 'visibility');
 const visibilityPolicy = ref<VisibilityPolicy | null>(null);
 const visibilityReason = ref('visibilityLoading');
 watch(
   () => [props.edit, userInfo.value.token, config.value.serverURL] as const,
   async ([edit, token, serverURL], _previous, onCleanup) => {
-    editVisibility.value = edit?.visibility || 'public';
     visibilityPolicy.value = null;
     visibilityReason.value = 'visibilityLoading';
     if (!edit || !token) return;
@@ -149,9 +164,10 @@ const privateChoice = computed({
   },
 });
 const editor = computed({
-  get: () => (props.edit || isPrivate.value ? privateDraft.value : savedEditor.value),
+  get: () =>
+    props.edit || props.replyId || isPrivate.value ? privateDraft.value : savedEditor.value,
   set: (value: string) => {
-    if (props.edit || isPrivate.value) privateDraft.value = value;
+    if (props.edit || props.replyId || isPrivate.value) privateDraft.value = value;
     else savedEditor.value = value;
   },
 });
@@ -456,6 +472,8 @@ const submitComment = async (): Promise<void> => {
     // oxlint-disable-next-line typescript/no-non-null-assertion
     emit('submit', response.data!);
 
+    if (draftKey) draftStore?.delete(draftKey);
+
     editor.value = '';
 
     previewText.value = '';
@@ -644,7 +662,7 @@ watch(showGif, async (value) => {
 });
 
 onMounted(() => {
-  if (props.edit?.objectId) {
+  if (props.edit?.objectId && !restoredDraft) {
     editor.value = restoreEmoji(props.edit.orig, emoji.value.map);
   }
 

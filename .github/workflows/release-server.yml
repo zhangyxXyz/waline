@@ -20,7 +20,7 @@ concurrency:
 jobs:
   validate:
     name: Validate version tag
-    if: github.repository == 'zhangyxXyz/waline' && startsWith(github.ref, 'refs/tags/v')
+    if: github.repository == 'zhangyxXyz/waline' && startsWith(github.ref, 'refs/tags/v') && !contains(github.event.head_commit.message, '[client-only]')
     runs-on: ubuntu-latest
     permissions:
       contents: write
