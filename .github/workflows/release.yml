@@ -14,6 +14,7 @@ on:
           - all
           - client
           - admin
+          - backend
           - server
 
 permissions:
@@ -38,12 +39,12 @@ jobs:
         id: scope
         env:
           VERSION: ${{ github.ref_name }}
-          SCOPE: ${{ inputs.scope || (contains(github.event.head_commit.message, '[client-only]') && 'client') || (contains(github.event.head_commit.message, '[admin-only]') && 'admin') || 'all' }}
+          SCOPE: ${{ inputs.scope || (contains(github.event.head_commit.message, '[client-only]') && 'client') || (contains(github.event.head_commit.message, '[admin-only]') && 'admin') || (contains(github.event.head_commit.message, '[backend]') && 'backend') || 'all' }}
         shell: bash
         run: |
           [[ "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-seiun$ ]]
           git merge-base --is-ancestor HEAD origin/dev
-          case "$SCOPE" in all|client|admin|server) ;; *) exit 1 ;; esac
+          case "$SCOPE" in all|client|admin|server|backend) ;; *) exit 1 ;; esac
           echo "scope=$SCOPE" >> "$GITHUB_OUTPUT"
 
   client:
@@ -58,7 +59,7 @@ jobs:
   admin:
     name: Publish admin
     needs: validate
-    if: needs.validate.outputs.scope == 'all' || needs.validate.outputs.scope == 'admin'
+    if: contains(fromJSON('["all","admin","backend"]'), needs.validate.outputs.scope)
     uses: ./.github/workflows/release-admin.yml
     permissions:
       contents: read
@@ -67,7 +68,7 @@ jobs:
   server:
     name: Publish server
     needs: validate
-    if: needs.validate.outputs.scope == 'all' || needs.validate.outputs.scope == 'server'
+    if: contains(fromJSON('["all","server","backend"]'), needs.validate.outputs.scope)
     uses: ./.github/workflows/release-server.yml
     permissions:
       contents: read
@@ -144,11 +145,11 @@ jobs:
             gh release upload "$VERSION" release-assets/waline-client.tar.gz release-assets/SHA256SUMS --clobber
             printf 'Client source: %s. Verify waline-client.tar.gz with SHA256SUMS and version.json.\n' "$GITHUB_SHA" >> "$RUNNER_TEMP/release-notes.md"
           fi
-          if [ "$SCOPE" = all ] || [ "$SCOPE" = admin ]; then
+          if [ "$SCOPE" = all ] || [ "$SCOPE" = admin ] || [ "$SCOPE" = backend ]; then
             gh release upload "$VERSION" release-assets/waline-admin.tar.gz release-assets/ADMIN-SHA256SUMS --clobber
             printf 'Admin source: %s. Verify waline-admin.tar.gz with ADMIN-SHA256SUMS and version.json.\n' "$GITHUB_SHA" >> "$RUNNER_TEMP/release-notes.md"
           fi
-          if [ "$SCOPE" = all ] || [ "$SCOPE" = server ]; then
+          if [ "$SCOPE" = all ] || [ "$SCOPE" = server ] || [ "$SCOPE" = backend ]; then
             [[ "$DIGEST" =~ ^sha256:[a-f0-9]{64}$ ]]
             printf 'Server source: %s. Pinned image: ghcr.io/zhangyxxyz/waline@%s (linux/amd64, linux/arm64).\n' "$GITHUB_SHA" "$DIGEST" >> "$RUNNER_TEMP/release-notes.md"
           else

@@ -79,8 +79,12 @@ module.exports = class extends Base {
   }
   async postAction() {
     this.check();
-    if (this.get('section') === 'visits-preview')
-      {return this.success(await visits.preview(this.getModel('Counter'), this.post('items')));}
+    if (this.get('section') === 'mail-test') {
+      return this.success(await require('../service/mail-test.js').send(this.post()));
+    }
+    if (this.get('section') === 'visits-preview') {
+      return this.success(await visits.preview(this.getModel('Counter'), this.post('items')));
+    }
     if (this.get('section') === 'download-test') {
       return this.success(
         await require('../service/region-database.js').testConnection(this.post()),

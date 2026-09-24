@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import Header from '../../components/Header.jsx';
+import MailTest from '../../components/MailTest.jsx';
 import SmtpSettings from '../../components/SmtpSettings.jsx';
 import { LANGUAGE_OPTIONS } from '../../locales/index.js';
 import request from '../../utils/request.js';
@@ -209,6 +210,13 @@ export default function Mail() {
                 </fieldset>
               )}
               <p role="status">{message && t(message)}</p>
+              {data && (
+                <MailTest
+                  key={`${kind}:${language}`}
+                  disabled={busy}
+                  template={{ language, kind, subject: data.subject, body: data.body }}
+                />
+              )}
               {preview && (
                 <>
                   <h3>{preview.subject}</h3>

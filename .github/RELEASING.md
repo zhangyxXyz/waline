@@ -2,7 +2,15 @@
 
 `Release Waline` (`workflows/release.yml`) is the release entry point. Select a
 version tag such as `v1.41.6-seiun` when running it manually, then choose `all`,
-`client`, `admin`, or `server` in `scope`. The tagged commit must be on `dev`.
+`client`, `admin`, `server`, or `backend` (admin + server) in `scope`.
+The tagged commit must be on `dev`. A `[backend]` commit marker selects backend
+on tag pushes while preserving the existing client release assets.
+
+The SMTP and template pages support test emails to an explicit recipient. SMTP
+tests use saved settings. Template tests render the current editor content with
+sample comments without saving it. Only administrators may use the endpoint,
+with a 30-second cooldown per server process. A successful result means the SMTP
+server accepted the message, not that it reached the inbox.
 
 - `publish @waline/client` builds and tests the client and returns its archive and
   checksums as a workflow artifact. Its original upstream npm publishing job is

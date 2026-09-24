@@ -2,12 +2,14 @@ import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import request from '../utils/request.js';
+import MailTest from './MailTest.jsx';
 
 export default function SmtpSettings({ onDirty }) {
   const { t } = useTranslation();
   const [data, setData] = useState(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
+  const [dirty, setDirty] = useState(false);
   useEffect(() => {
     let active = true;
     request('settings?section=smtp')
@@ -22,6 +24,7 @@ export default function SmtpSettings({ onDirty }) {
   const edit = (key, value) => {
     setData({ ...data, [key]: value });
     onDirty(true);
+    setDirty(true);
     setMessage('');
   };
   const save = async () => {
@@ -30,6 +33,7 @@ export default function SmtpSettings({ onDirty }) {
       const value = await request('settings?section=smtp', { method: 'PUT', body: data });
       setData({ ...value, password: '', clearPassword: false });
       onDirty(false);
+      setDirty(false);
       setMessage('settings.saved');
     } catch {
       setMessage('smtp.invalid');
@@ -76,6 +80,11 @@ export default function SmtpSettings({ onDirty }) {
                     }
                     value={data[key]}
                     autoComplete={key === 'password' ? 'new-password' : 'off'}
+                    placeholder={
+                      key === 'password'
+                        ? t(data.passwordConfigured ? 'smtp.passwordSaved' : 'smtp.passwordEmpty')
+                        : undefined
+                    }
                     min={key === 'port' ? 1 : undefined}
                     max={key === 'port' ? 65535 : undefined}
                     onChange={(e) =>
@@ -110,6 +119,7 @@ export default function SmtpSettings({ onDirty }) {
         </fieldset>
       )}
       <p role="status">{message && t(message)}</p>
+      {data && <MailTest disabled={busy || dirty} />}
     </section>
   );
 }
