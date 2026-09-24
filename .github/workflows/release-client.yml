@@ -1,10 +1,8 @@
 name: 'publish @waline/client'
 
 on:
-  workflow_dispatch:
+  workflow_call:
   push:
-    tags:
-      - 'v*'
     branches:
       - main
     paths:
@@ -13,32 +11,17 @@ on:
 
 permissions:
   contents: read
-  id-token: write
 
 jobs:
   release-seiun:
-    concurrency:
-      group: seiun-waline-release
-      cancel-in-progress: false
-    if: github.repository == 'zhangyxXyz/waline' && startsWith(github.ref, 'refs/tags/v') && (github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[client-only]'))
+    if: github.repository == 'zhangyxXyz/waline' && startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     env:
-      GH_TOKEN: ${{ github.token }}
-      GH_REPO: ${{ github.repository }}
       VERSION: ${{ github.ref_name }}
     steps:
       - uses: actions/checkout@v7
         with:
-          fetch-depth: 0
           persist-credentials: false
-      - name: Validate existing release and source
-        shell: bash
-        run: |
-          [[ "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-seiun$ ]]
-          git merge-base --is-ancestor HEAD origin/dev
-          test "$(gh release view "$VERSION" --json isDraft --jq .isDraft)" = false
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
         with:
@@ -60,28 +43,17 @@ jobs:
           cd release-assets
           sha256sum waline-client.tar.gz > SHA256SUMS
           sha256sum --check SHA256SUMS
-      - name: Preserve previous client package
-        run: gh release download "$VERSION" --pattern waline-client.tar.gz --pattern SHA256SUMS --dir previous-client
       - uses: actions/upload-artifact@v7
         with:
-          name: previous-client
-          path: previous-client/
-      - name: Update client assets only
-        shell: bash
-        run: |
-          gh release view "$VERSION" --json body --jq .body > "$RUNNER_TEMP/release-notes.md"
-          cat >> "$RUNNER_TEMP/release-notes.md" <<EOF
-
-          ### Client-only update ($GITHUB_SHA)
-          The client archive now comes from this commit. Edit/reply drafts are isolated by operation and comment, retained in page memory across switches, and removed after successful submission or page/account changes.
-          The Docker image and server deployment remain unchanged; the image reference above belongs to the previous server build.
-          Verify the updated client archive using SHA256SUMS and version.json.
-          EOF
-          gh release upload "$VERSION" release-assets/waline-client.tar.gz release-assets/SHA256SUMS --clobber
-          gh release edit "$VERSION" --notes-file "$RUNNER_TEMP/release-notes.md"
+          name: waline-client
+          path: release-assets/
+          if-no-files-found: error
 
   publish:
     if: github.repository == 'walinejs/waline'
+    permissions:
+      contents: read
+      id-token: write
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

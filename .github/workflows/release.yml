@@ -1,0 +1,130 @@
+name: Release Waline
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      scope:
+        description: Components to publish (select a version tag as the ref)
+        type: choice
+        default: all
+        options:
+          - all
+          - client
+          - server
+
+permissions:
+  contents: read
+
+concurrency:
+  group: seiun-waline-release
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    if: github.repository == 'zhangyxXyz/waline' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    outputs:
+      scope: ${{ steps.scope.outputs.scope }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Validate version and select components
+        id: scope
+        env:
+          VERSION: ${{ github.ref_name }}
+          SCOPE: ${{ inputs.scope || (contains(github.event.head_commit.message, '[client-only]') && 'client') || 'all' }}
+        shell: bash
+        run: |
+          [[ "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-seiun$ ]]
+          git merge-base --is-ancestor HEAD origin/dev
+          case "$SCOPE" in all|client|server) ;; *) exit 1 ;; esac
+          echo "scope=$SCOPE" >> "$GITHUB_OUTPUT"
+
+  client:
+    name: Publish client
+    needs: validate
+    if: needs.validate.outputs.scope != 'server'
+    uses: ./.github/workflows/release-client.yml
+    permissions:
+      contents: read
+      id-token: write
+
+  server:
+    name: Publish server
+    needs: validate
+    if: needs.validate.outputs.scope != 'client'
+    uses: ./.github/workflows/release-server.yml
+    permissions:
+      contents: read
+      packages: write
+      actions: write
+
+  release:
+    name: Publish GitHub Release
+    needs: [validate, client, server]
+    if: >-
+      always() && needs.validate.result == 'success' &&
+      (needs.client.result == 'success' || needs.client.result == 'skipped') &&
+      (needs.server.result == 'success' || needs.server.result == 'skipped')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      VERSION: ${{ github.ref_name }}
+      SCOPE: ${{ needs.validate.outputs.scope }}
+      DIGEST: ${{ needs.server.outputs.digest }}
+    steps:
+      - uses: actions/download-artifact@v8
+        if: needs.client.result == 'success'
+        with:
+          name: waline-client
+          path: release-assets
+      - name: Verify client package
+        if: needs.client.result == 'success'
+        working-directory: release-assets
+        run: sha256sum --check SHA256SUMS
+      - name: Preserve existing release
+        id: previous
+        shell: bash
+        run: |
+          gh api --paginate "repos/$GH_REPO/releases?per_page=100" > "$RUNNER_TEMP/releases.json"
+          if jq -s -e --arg version "$VERSION" 'any(.[][]; .tag_name == $version)' "$RUNNER_TEMP/releases.json"; then
+            mkdir -p previous-release
+            gh release view "$VERSION" --json body,assets > previous-release/release.json
+            jq -r .body previous-release/release.json > "$RUNNER_TEMP/release-notes.md"
+            if jq -e 'any(.assets[]; .name == "waline-client.tar.gz")' previous-release/release.json; then
+              gh release download "$VERSION" --pattern waline-client.tar.gz --pattern SHA256SUMS --dir previous-release
+            fi
+            echo 'exists=true' >> "$GITHUB_OUTPUT"
+          else
+            printf '## Seiun Waline\n' > "$RUNNER_TEMP/release-notes.md"
+            gh release create "$VERSION" --draft --verify-tag --title "$VERSION" --notes-file "$RUNNER_TEMP/release-notes.md"
+          fi
+      - uses: actions/upload-artifact@v7
+        if: steps.previous.outputs.exists == 'true'
+        with:
+          name: previous-release
+          path: previous-release/
+          if-no-files-found: error
+      - name: Publish selected components
+        shell: bash
+        run: |
+          printf '\n### %s update (%s)\n' "$SCOPE" "$GITHUB_SHA" >> "$RUNNER_TEMP/release-notes.md"
+          if [ "$SCOPE" != server ]; then
+            gh release upload "$VERSION" release-assets/waline-client.tar.gz release-assets/SHA256SUMS --clobber
+            printf 'Client source: %s. Verify waline-client.tar.gz with SHA256SUMS and version.json.\n' "$GITHUB_SHA" >> "$RUNNER_TEMP/release-notes.md"
+          fi
+          if [ "$SCOPE" != client ]; then
+            [[ "$DIGEST" =~ ^sha256:[a-f0-9]{64}$ ]]
+            printf 'Server source: %s. Pinned image: ghcr.io/zhangyxxyz/waline@%s (linux/amd64, linux/arm64).\n' "$GITHUB_SHA" "$DIGEST" >> "$RUNNER_TEMP/release-notes.md"
+          else
+            printf 'Server image unchanged.\n' >> "$RUNNER_TEMP/release-notes.md"
+          fi
+          gh release edit "$VERSION" --notes-file "$RUNNER_TEMP/release-notes.md" --draft=false
