@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import Header from '../../components/Header.jsx';
+import MailEmojiUrls from '../../components/MailEmojiUrls.jsx';
 import MailTest from '../../components/MailTest.jsx';
 import SmtpSettings from '../../components/SmtpSettings.jsx';
 import { LANGUAGE_OPTIONS } from '../../locales/index.js';
@@ -31,7 +32,7 @@ export default function Mail() {
     setMessage('');
     setPreview(null);
     setDirty(false);
-    if (kind === 'smtp') return;
+    if (kind === 'smtp' || kind === 'emojiUrls') return;
     request(`settings?section=mail&language=${language}&kind=${kind}`)
       .then((value) => {
         if (active) {
@@ -105,7 +106,7 @@ export default function Mail() {
       <div className="main">
         <div className="body container">
           <nav className="waline-management-tabs">
-            {['smtp', 'reply', 'admin'].map((value) => (
+            {['smtp', 'reply', 'admin', 'emojiUrls'].map((value) => (
               <button
                 key={value}
                 type="button"
@@ -122,6 +123,8 @@ export default function Mail() {
           </div>
           {kind === 'smtp' ? (
             <SmtpSettings onDirty={setDirty} />
+          ) : kind === 'emojiUrls' ? (
+            <MailEmojiUrls onDirty={setDirty} />
           ) : (
             <section className="waline-region-settings waline-mail-editor">
               <label>

@@ -12,6 +12,12 @@
   display: block;
   margin: 16px 0;
 }
+.waline-emoji-rule {
+  margin: 16px 0;
+  padding: 0 16px 16px;
+  border: 1px solid var(--wa-border);
+  border-radius: 8px;
+}
 .waline-smtp-field input {
   display: block;
   box-sizing: border-box;

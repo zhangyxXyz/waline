@@ -117,5 +117,14 @@
   "download.validating": "Validating…",
   "download.reason": "Failure details",
   "smtp.authorNotify": "Email the author about new comments",
-  "smtp.authorNotifyTip": "Send public comments (including pending moderation) to the author mailbox. Approved private comments notify the other participant independently of this switch. Private mail to the author uses the same notification recipient, falling back to the author's account email when unset. All mail requires enabled SMTP."
+  "smtp.authorNotifyTip": "Send public comments (including pending moderation) to the author mailbox. Approved private comments notify the other participant independently of this switch. Private mail to the author uses the same notification recipient, falling back to the author's account email when unset. All mail requires enabled SMTP.",
+  "mail.emojiUrls": "Emoji image URLs",
+  "mail.emojiEnabled": "Rewrite emoji URLs in emails",
+  "mail.emojiTip": "Only rewrites images marked wl-emoji in outgoing emails, including quoted replies. Regular images, links and stored comments remain unchanged. Existing emails cannot be updated.",
+  "mail.emojiFrom": "Original directory URL prefix",
+  "mail.emojiTo": "Replacement directory URL prefix",
+  "mail.emojiRemove": "Remove rule",
+  "mail.emojiAdd": "Add rule",
+  "mail.emojiOrder": "Use HTTP(S) directory URLs ending in /. Both @ and %40 are supported. The first matching rule wins; replacements are not chained. Up to 20 rules. Save to apply.",
+  "mail.emojiInvalid": "Save failed. Check directory URLs, duplicate rules and your connection."
 }

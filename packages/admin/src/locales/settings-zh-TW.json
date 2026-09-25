@@ -117,5 +117,14 @@
   "download.validating": "正在校驗…",
   "download.reason": "失敗詳情",
   "smtp.authorNotify": "站長新評論郵件通知",
-  "smtp.authorNotifyTip": "開啟後，公開新評論（含待審核評論）寄至站長通知信箱。私密評論僅在審核通過後通知對話另一方，不受此開關影響；寄給站長時同樣使用站長通知收件信箱（未設定時使用站長帳戶信箱）。所有郵件都需要啟用 SMTP。"
+  "smtp.authorNotifyTip": "開啟後，公開新評論（含待審核評論）寄至站長通知信箱。私密評論僅在審核通過後通知對話另一方，不受此開關影響；寄給站長時同樣使用站長通知收件信箱（未設定時使用站長帳戶信箱）。所有郵件都需要啟用 SMTP。",
+  "mail.emojiUrls": "表情圖片位址",
+  "mail.emojiEnabled": "啟用郵件表情位址替換",
+  "mail.emojiTip": "只替換郵件中帶 wl-emoji 標記的表情圖片，包括回覆引用。一般圖片、連結及已儲存的評論不受影響；舊郵件不會更新。",
+  "mail.emojiFrom": "原位址目錄前綴",
+  "mail.emojiTo": "替換為目錄前綴",
+  "mail.emojiRemove": "刪除規則",
+  "mail.emojiAdd": "新增規則",
+  "mail.emojiOrder": "使用以 / 結尾的 HTTP(S) 目錄位址，自動相容 @ 和 %40。依序匹配第一條規則，只替換一次；最多 20 條。儲存後生效。",
+  "mail.emojiInvalid": "儲存失敗。請檢查目錄位址、重複規則及網路連線。"
 }

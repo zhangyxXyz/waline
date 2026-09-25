@@ -2,6 +2,7 @@ const Base = require('./rest.js');
 const settings = require('../service/dashboard-settings.js');
 const mail = require('../service/mail-templates.js');
 const smtp = require('../service/smtp-settings.js');
+const mailEmojiUrls = require('../service/mail-emoji-urls.js');
 const visits = require('../service/visit-management.js');
 
 module.exports = class extends Base {
@@ -12,6 +13,9 @@ module.exports = class extends Base {
   async getAction() {
     this.check();
     switch (this.get('section')) {
+      case 'mail-emoji-urls': {
+        return this.success(mailEmojiUrls.read());
+      }
       case 'visits': {
         const all = await visits.snapshot(this.getModel('Counter'));
         const query = String(this.get('search') || '').slice(0, 255);
@@ -49,6 +53,9 @@ module.exports = class extends Base {
   async putAction() {
     this.check();
     switch (this.get('section')) {
+      case 'mail-emoji-urls': {
+        return this.success(mailEmojiUrls.save(this.post()));
+      }
       case 'visits': {
         return this.success(await visits.edit(this.getModel('Counter'), this.post()));
       }
@@ -90,7 +97,10 @@ module.exports = class extends Base {
         await require('../service/region-database.js').testConnection(this.post()),
       );
     }
-    if (this.get('section') === 'mail-preview') return this.success(mail.preview(this.post()));
+    if (this.get('section') === 'mail-preview') {
+      const preview = mail.preview(this.post());
+      return this.success({ ...preview, body: mailEmojiUrls.rewrite(preview.body) });
+    }
     return this.ctx.throw(400);
   }
 };

@@ -117,5 +117,14 @@
   "download.validating": "正在校验…",
   "download.reason": "失败详情",
   "smtp.authorNotify": "博主新评论邮件通知",
-  "smtp.authorNotifyTip": "开启后，公开新评论（含待审核评论）发送到站长通知邮箱。私密评论仅在审核通过后通知对话另一方，不受此开关影响；发给博主时同样使用站长通知收件邮箱（未配置时使用博主账户邮箱）。所有邮件都需要启用 SMTP。"
+  "smtp.authorNotifyTip": "开启后，公开新评论（含待审核评论）发送到站长通知邮箱。私密评论仅在审核通过后通知对话另一方，不受此开关影响；发给博主时同样使用站长通知收件邮箱（未配置时使用博主账户邮箱）。所有邮件都需要启用 SMTP。",
+  "mail.emojiUrls": "表情图片地址",
+  "mail.emojiEnabled": "启用邮件表情地址替换",
+  "mail.emojiTip": "只替换邮件中带 wl-emoji 标记的表情图片，包括回复引用。普通图片、链接及已保存的评论不受影响；旧邮件不会更新。",
+  "mail.emojiFrom": "原地址目录前缀",
+  "mail.emojiTo": "替换为目录前缀",
+  "mail.emojiRemove": "删除规则",
+  "mail.emojiAdd": "添加规则",
+  "mail.emojiOrder": "使用以 / 结尾的 HTTP(S) 目录地址，自动兼容 @ 和 %40。按顺序匹配第一条规则，只替换一次；最多 20 条。保存后生效。",
+  "mail.emojiInvalid": "保存失败。请检查目录地址、重复规则及网络连接。"
 }

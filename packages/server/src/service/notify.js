@@ -6,6 +6,7 @@ const nunjucks = require('nunjucks');
 const mailTemplates = require('./mail-templates.js');
 const dashboardSettings = require('./dashboard-settings.js');
 const smtpSettings = require('./smtp-settings.js');
+const mailEmojiUrls = require('./mail-emoji-urls.js');
 const { active, same, canRead, isPrivate } = require('./comment-privacy.js');
 
 module.exports = class NotifyService extends think.Service {
@@ -67,7 +68,7 @@ module.exports = class NotifyService extends think.Service {
       from: smtpSettings.from(),
       to,
       subject: title,
-      html: content,
+      html: mailEmojiUrls.rewrite(content),
     });
   }
 
