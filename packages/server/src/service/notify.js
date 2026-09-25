@@ -6,6 +6,7 @@ const nunjucks = require('nunjucks');
 const mailTemplates = require('./mail-templates.js');
 const dashboardSettings = require('./dashboard-settings.js');
 const smtpSettings = require('./smtp-settings.js');
+const { active, same, canRead, isPrivate } = require('./comment-privacy.js');
 
 module.exports = class NotifyService extends think.Service {
   constructor(controller) {
@@ -47,6 +48,19 @@ module.exports = class NotifyService extends think.Service {
     } else {
       title = this.controller.locale(title, data);
       content = this.controller.locale(content, data);
+    }
+
+    if (isPrivate(self)) {
+      const chinese = lang.startsWith('zh');
+      const label = chinese ? '私密评论' : 'Private comment';
+      const notice = chinese
+        ? '仅对话双方及管理员可见，请勿转发邮件内容。'
+        : 'Visible only to the participants and administrators. Please do not forward.';
+      title = `[${label}] ${title}`;
+      const badge = `<div role="note" style="max-width:600px;margin:16px auto;padding:12px 16px;border:1px solid #b9c4e8;border-radius:12px;color:#6265a8;background:#f2ecfa;font:14px/1.6 sans-serif"><strong>${label}</strong> · ${notice}</div>`;
+      content = /<body\b[^>]*>/iu.test(content)
+        ? content.replace(/<body\b[^>]*>/iu, (opening) => opening + badge)
+        : badge + content;
     }
 
     return this.transporter.sendMail({
@@ -486,9 +500,66 @@ module.exports = class NotifyService extends think.Service {
     console.log(`FeiShu Notification Success:${JSON.stringify(resp)}`);
   }
 
+  realEmail(email) {
+    if (typeof email !== 'string' || !/^[^\s<>@]+@[^\s<>@]+\.[^\s<>@]+$/u.test(email)) return false;
+    // OAuth placeholder addresses are not deliverable mailboxes.
+    const domain = email.split('@')[1].toLowerCase();
+    return (
+      !/^mail\.[^.]+$/u.test(domain) &&
+      !(this.controller.ctx.state.oauthServices || []).some(
+        ({ name }) => domain === `mail.${name}`.toLowerCase(),
+      )
+    );
+  }
+
+  async privateMail(comment, parent) {
+    if (!isPrivate(comment) || comment.status !== 'approved') return;
+    const ids = [comment.private_user_a, comment.private_user_b];
+    if (ids.some((id) => id == null) || same(...ids)) return;
+    if (!ids.some((id) => same(id, comment.user_id))) return;
+    const accounts = await this.controller.getModel('Users').select({ objectId: ['IN', ids] });
+    const sender = accounts.find((user) => same(user.objectId, comment.user_id));
+    const recipient = accounts.find(
+      (user) => ids.some((id) => same(id, user.objectId)) && !same(user.objectId, comment.user_id),
+    );
+    if (!active(sender) || !active(recipient) || !this.realEmail(recipient.email)) return;
+    // Do not quote a parent whose audience has changed or cannot be verified.
+    if (
+      parent &&
+      (!canRead(recipient, parent) ||
+        (parent.status !== 'approved' &&
+          recipient.type !== 'administrator' &&
+          !same(parent.user_id, recipient.objectId)))
+    ) {
+      return;
+    }
+    const config = think.config();
+    await this.mail(
+      {
+        to: recipient.email,
+        templateKind: parent ? 'reply' : 'admin',
+        title: parent
+          ? config.mailSubject || 'MAIL_SUBJECT'
+          : config.mailSubjectAdmin || 'MAIL_SUBJECT_ADMIN',
+        content: parent
+          ? config.mailTemplate || 'MAIL_TEMPLATE'
+          : config.mailTemplateAdmin || 'MAIL_TEMPLATE_ADMIN',
+      },
+      comment,
+      parent,
+    );
+  }
+
   async run(comment, parent, disableAuthorNotify = false) {
-    // Private conversations must not reach email templates or third-party relays.
-    if (comment.visibility === 'private' || parent?.visibility === 'private') return;
+    // Private mail is account-addressed and never reaches third-party relays.
+    if (isPrivate(comment) || isPrivate(parent)) {
+      try {
+        await this.privateMail(comment, parent);
+      } catch {
+        console.error('Private notification failed');
+      }
+      return;
+    }
     const { DISABLE_AUTHOR_NOTIFY } = process.env;
     const AUTHOR_EMAIL = smtpSettings.read().authorEmail;
     const { mailSubject, mailTemplate, mailSubjectAdmin, mailTemplateAdmin } = think.config();
@@ -505,21 +576,22 @@ module.exports = class NotifyService extends think.Service {
     const content = mailTemplateAdmin || 'MAIL_TEMPLATE_ADMIN';
 
     if (!DISABLE_AUTHOR_NOTIFY && !isAdminComment && !disableAuthorNotify) {
-      const wechat = await this.wechat({ title, content }, comment, parent);
-      const qywxAmWechat = await this.qywxAmWechat({ title, content }, comment, parent);
-      const qq = await this.qq(comment, parent);
-      const telegram = await this.telegram(comment, parent);
-      const pushplus = await this.pushplus({ title, content }, comment, parent);
-      const discord = await this.discord({ title, content }, comment, parent);
-      const lark = await this.lark({ title, content }, comment, parent);
+      await this.wechat({ title, content }, comment, parent);
+      await this.qywxAmWechat({ title, content }, comment, parent);
+      await this.qq(comment, parent);
+      await this.telegram(comment, parent);
+      await this.pushplus({ title, content }, comment, parent);
+      await this.discord({ title, content }, comment, parent);
+      await this.lark({ title, content }, comment, parent);
+    }
 
-      if (
-        [wechat, qq, telegram, qywxAmWechat, pushplus, discord, lark].every((item) =>
-          think.isEmpty(item),
-        )
-      ) {
-        mailList.push({ to: AUTHOR_EMAIL, title, content, templateKind: 'admin' });
-      }
+    if (
+      smtpSettings.read().authorNotify &&
+      !isAdminComment &&
+      !disableAuthorNotify &&
+      this.realEmail(AUTHOR_EMAIL)
+    ) {
+      mailList.push({ to: AUTHOR_EMAIL, title, content, templateKind: 'admin' });
     }
 
     const disallowList = this.controller.ctx.state.oauthServices.map(({ name }) => `mail.${name}`);
@@ -541,6 +613,9 @@ module.exports = class NotifyService extends think.Service {
     }
 
     for (const mail of mailList) {
+      if (mailList.find((item) => item.to?.toLowerCase() === mail.to?.toLowerCase()) !== mail) {
+        continue;
+      }
       try {
         const response = await this.mail(mail, comment, parent);
 

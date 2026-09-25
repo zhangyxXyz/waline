@@ -83,7 +83,7 @@
   "mail.reply": "回覆通知範本",
   "mail.admin": "站長通知範本",
   "mail.language": "範本語言",
-  "mail.tip": "依語言及通知類型獨立儲存，未自訂的語言沿用現有預設範本。傳送郵件仍需設定 SMTP；私人評論不傳送通知。",
+  "mail.tip": "按語言和通知類型獨立儲存。私密評論沿用對應範本，並自動加入私密標題和內文標示。",
   "mail.subject": "郵件標題",
   "mail.body": "HTML 內文",
   "mail.variables": "點選變數插入最近編輯欄位的游標位置；評論內容只能插入內文。",
@@ -115,5 +115,7 @@
   "download.connecting": "正在連線…",
   "download.downloading": "正在下載…",
   "download.validating": "正在校驗…",
-  "download.reason": "失敗詳情"
+  "download.reason": "失敗詳情",
+  "smtp.authorNotify": "站長新評論郵件通知",
+  "smtp.authorNotifyTip": "開啟後，公開新評論（含待審核評論）寄至站長通知信箱。私密評論僅在審核通過後通知對話另一方（包括站長），不受此開關影響；所有郵件都需要啟用 SMTP。"
 }

@@ -411,7 +411,16 @@ describe('private reply access', () => {
     expect([row.private_user_a, row.private_user_b]).toStrictEqual([1, 2]);
     expect(row.visibility).toBe('private');
     expect(sideEffect).not.toHaveBeenCalled();
-    expect(notifyRun).not.toHaveBeenCalled();
+    expect(notifyRun).toHaveBeenCalledWith(
+      expect.objectContaining({
+        visibility: 'private',
+        private_user_a: '1',
+        private_user_b: '2',
+        status: 'approved',
+      }),
+      expect.any(Object),
+    );
+    expect(result.data).not.toHaveProperty('private_user_a');
     expect(akismetCheck).not.toHaveBeenCalled();
   });
 
@@ -419,6 +428,36 @@ describe('private reply access', () => {
     const result = await post(2, { pid: 2, visibility: undefined });
     expect(result.errno).toBe(0);
     expect(result.data.visibility).toBe('private');
+  });
+
+  it('holds newly created private comments until moderation passes', async () => {
+    const audit = think.config('audit');
+    think.config('audit', true);
+    try {
+      const result = await post(1, { pid: undefined, rid: undefined });
+      expect(result.errno).toBe(0);
+      expect(result.data.status).toBe('waiting');
+      expect(notifyRun).not.toHaveBeenCalled();
+      await json(`/api/comment/${result.data.objectId}`, 4, 'PUT', { status: 'approved' });
+      expect(notifyRun).toHaveBeenCalledTimes(1);
+    } finally {
+      think.config('audit', audit ?? false);
+    }
+  });
+
+  it('includes levels and account roles in recent comments without leaking private rows', async () => {
+    const previous = think.config('levels');
+    think.config('levels', [0, 2, 10]);
+    db.exec("UPDATE Users SET type='administrator' WHERE id=2");
+    const admin = await json('/api/comment?type=recent&count=10');
+    const owner = admin.data.find((row) => row.objectId === 1);
+    expect(owner.type).toBe('administrator');
+    expect(owner.level).toBeTypeOf('number');
+    db.exec("UPDATE Users SET type='guest' WHERE id=2");
+    const guest = await json('/api/comment?type=recent&count=10');
+    expect(guest.data.find((row) => row.objectId === 1).level).toBeTypeOf('number');
+    expect(JSON.stringify(guest)).not.toContain('PRIVATE_SENTINEL');
+    think.config('levels', previous ?? false);
   });
 
   it.each([
@@ -516,7 +555,7 @@ describe('private reply access', () => {
       expect(
         (await post(2, { pid: result.data.objectId, rid: 1, visibility: undefined })).errno,
       ).toBe(0);
-      expect(notifyRun).not.toHaveBeenCalled();
+      expect(notifyRun).toHaveBeenCalledTimes(2);
     },
   );
 
@@ -573,6 +612,27 @@ describe('private reply access', () => {
       (await json('/api/comment?type=list', 4)).data.data.some((c) => c.visibility === 'private'),
     ).toBe(true);
     expect((await json('/api/comment?type=list', 3)).errno).not.toBe(0);
+  });
+
+  it.each([false, true])('notifies a private comment only on approval (root=%s)', async (root) => {
+    if (root) db.exec('UPDATE Comment SET pid=NULL,rid=NULL,private_user_b=4 WHERE id=2');
+    db.exec("UPDATE Comment SET status='waiting' WHERE id=2");
+    await json('/api/comment/2', 4, 'PUT', { comment: 'edited pending comment' });
+    expect(notifyRun).not.toHaveBeenCalled();
+    const result = await json('/api/comment/2', 4, 'PUT', { status: 'approved' });
+    expect(result.errno).toBe(0);
+    expect(result.data).not.toHaveProperty('private_user_a');
+    expect(notifyRun).toHaveBeenCalledTimes(1);
+    expect(notifyRun.mock.calls[0][0]).toMatchObject({
+      visibility: 'private',
+      status: 'approved',
+      private_user_a: 1,
+      private_user_b: root ? 4 : 2,
+    });
+    expect(Boolean(notifyRun.mock.calls[0][1])).toBe(!root);
+    await json('/api/comment/2', 4, 'PUT', { status: 'approved' });
+    await json('/api/comment/2', 4, 'PUT', { like: true });
+    expect(notifyRun).toHaveBeenCalledTimes(1);
   });
 
   it('exports private rows only to administrators and refuses lossy online restore', async () => {

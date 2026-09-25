@@ -83,7 +83,7 @@
   "mail.reply": "Reply notification",
   "mail.admin": "Site owner notification",
   "mail.language": "Template language",
-  "mail.tip": "Templates are saved separately by language and notification type. Unconfigured languages use existing defaults. SMTP must be configured to send emails. Private comments do not send notifications.",
+  "mail.tip": "Templates are saved by language and notification type. Private notifications use the corresponding template with an automatic private label in the subject and body.",
   "mail.subject": "Subject",
   "mail.body": "HTML body",
   "mail.variables": "Click a variable to insert it at the cursor in the last focused field. Comment content can only be inserted into the body.",
@@ -115,5 +115,7 @@
   "download.connecting": "Connecting…",
   "download.downloading": "Downloading…",
   "download.validating": "Validating…",
-  "download.reason": "Failure details"
+  "download.reason": "Failure details",
+  "smtp.authorNotify": "Email the author about new comments",
+  "smtp.authorNotifyTip": "Send public comments (including pending moderation) to the author mailbox. Approved private comments notify the other participant, including the author, independently of this switch. All mail requires enabled SMTP."
 }

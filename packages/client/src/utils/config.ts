@@ -67,6 +67,7 @@ export const getConfig = ({
   lang = typeof navigator === 'undefined' ? 'en-US' : navigator.language,
   locale,
   levelColors = {},
+  hideAdminLevel = false,
   labelColors = {},
   meta = ['nick', 'mail', 'link'],
   requiredMeta = [],
@@ -111,6 +112,7 @@ export const getConfig = ({
   ...more,
   localeOverrides: typeof locale === 'object' && locale ? { ...locale } : {},
   levelColors,
+  hideAdminLevel,
   labelColors,
   // oxlint-disable-next-line typescript/strict-boolean-expressions, typescript/prefer-nullish-coalescing
   reaction: reaction === true ? DEFAULT_REACTION : reaction || null,

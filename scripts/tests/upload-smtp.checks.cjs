@@ -51,7 +51,10 @@ test('upload and SMTP settings persist safely and stay administrator-only', asyn
     assert.equal(smtp.transport(), null);
     smtp.save({ useEnvironment: true });
     assert.equal(smtp.transport().auth.pass, 'environment-secret');
-    assert.deepEqual(store.read().smtp, { useEnvironment: true });
+    assert.deepEqual(store.read().smtp, {
+      useEnvironment: true,
+      authorNotify: smtp.read().authorNotify,
+    });
 
     const module = { exports: {} };
     vm.runInNewContext(

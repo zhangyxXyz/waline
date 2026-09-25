@@ -15,6 +15,8 @@ import type { WalineLocale } from './locale.js';
 export interface WalineProps {
   /** Optional level0..level19 colors. Unset fields retain default badge styling. */
   levelColors?: Record<string, WalineBadgeColors>;
+  /** Hide administrator level badges, preserving their exclusive identity label. */
+  hideAdminLevel?: boolean;
   /** Exclusive-label colors keyed by exact label text; override server colors. */
   labelColors?: Record<string, WalineBadgeColors>;
   /**

@@ -83,7 +83,7 @@
   "mail.reply": "回复通知模板",
   "mail.admin": "站长通知模板",
   "mail.language": "模板语言",
-  "mail.tip": "按语言和通知类型独立保存，未自定义的语言沿用现有默认模板。发送邮件仍需配置 SMTP；私密评论不发送通知。",
+  "mail.tip": "按语言和通知类型独立保存。私密评论沿用对应模板，并自动添加私密标题和正文标识。",
   "mail.subject": "邮件标题",
   "mail.body": "HTML 正文",
   "mail.variables": "点击变量插入最近编辑输入框的光标位置；评论内容只能插入正文。",
@@ -115,5 +115,7 @@
   "download.connecting": "正在连接…",
   "download.downloading": "正在下载…",
   "download.validating": "正在校验…",
-  "download.reason": "失败详情"
+  "download.reason": "失败详情",
+  "smtp.authorNotify": "博主新评论邮件通知",
+  "smtp.authorNotifyTip": "开启后，公开新评论（含待审核评论）发送到站长通知邮箱。私密评论仅在审核通过后通知对话另一方（包括博主），不受此开关影响；所有邮件都需要启用 SMTP。"
 }

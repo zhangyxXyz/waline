@@ -117,7 +117,10 @@ const isEditingCurrent = computed(() => comment.objectId === edit?.objectId);
         <span v-if="comment['sticky']" class="wl-badge" v-text="locale.sticky" />
 
         <span
-          v-if="typeof comment.level === 'number'"
+          v-if="
+            !(config.hideAdminLevel && comment.type === 'administrator') &&
+            typeof comment.level === 'number'
+          "
           :class="`wl-badge level${comment.level}`"
           :style="levelStyle"
           v-text="levelLabel"

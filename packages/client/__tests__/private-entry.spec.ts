@@ -39,6 +39,51 @@ const renderControl = (overrides = {}) =>
   );
 
 describe('private comment entry', () => {
+  it('keeps one root draft when toggling privacy, persisting only its public version', () => {
+    const script = source.slice(
+      source.indexOf('const privateSelected ='),
+      source.indexOf('const userMeta ='),
+    );
+    const code = transpileModule(script, {
+      compilerOptions: { target: ScriptTarget.ES2022 },
+    }).outputText;
+    const draft = reactive({
+      text: 'typed before locking',
+      privateSelected: false,
+      visibility: 'public',
+    });
+    const saved = ref('typed before locking');
+    const bindings = {
+      ref,
+      computed,
+      watch,
+      toRef,
+      props: {},
+      userInfo: ref({ token: '' }),
+      config: ref({ serverURL: 'https://example.invalid', locale: {} }),
+      privateDraft: toRef(draft, 'text'),
+      savedEditor: saved,
+      draft,
+      notify: () => {},
+      getVisibilityPolicy: () => {},
+    };
+    const controls = new Function(
+      ...Object.keys(bindings),
+      `${code}; return {editor,privateChoice};`,
+    )(...Object.values(bindings));
+    controls.privateChoice.value = true;
+    expect(controls.editor.value).toBe('typed before locking');
+    expect(saved.value).toBe('');
+    controls.editor.value += ' and edited privately';
+    expect(saved.value).toBe('');
+    controls.privateChoice.value = false;
+    expect(controls.editor.value).toBe('typed before locking and edited privately');
+    expect(saved.value).toBe(controls.editor.value);
+    controls.privateChoice.value = true;
+    expect(controls.editor.value).toBe('typed before locking and edited privately');
+    expect(saved.value).toBe('');
+  });
+
   it('blocks forbidden local toggles with a reason and never persists an edit draft when unlocked', () => {
     const script = source.slice(
       source.indexOf('const privateSelected ='),

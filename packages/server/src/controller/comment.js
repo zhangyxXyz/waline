@@ -597,12 +597,29 @@ module.exports = class CommentController extends BaseRest {
         )
       : undefined;
 
-    if (data.status !== 'spam' && !isPrivate(data)) {
+    if (
+      data.status !== 'spam' &&
+      (!isPrivate(data) ||
+        (data.status === 'approved' && resp.private_user_a != null && resp.private_user_b != null))
+    ) {
       const notify = this.service('notify', this);
 
       await notify.run(
-        { ...cmtReturn, mail: resp.mail, rawComment: comment },
-        parentReturn ? { ...parentReturn, mail: parentComment.mail } : undefined,
+        {
+          ...cmtReturn,
+          mail: resp.mail,
+          rawComment: comment,
+          private_user_a: resp.private_user_a,
+          private_user_b: resp.private_user_b,
+        },
+        parentReturn
+          ? {
+              ...parentReturn,
+              mail: parentComment.mail,
+              private_user_a: parentComment.private_user_a,
+              private_user_b: parentComment.private_user_b,
+            }
+          : undefined,
       );
     }
 
@@ -704,22 +721,25 @@ module.exports = class CommentController extends BaseRest {
     );
 
     if (
-      !isPrivate(oldData) &&
-      !isPrivate(newData[0]) &&
       !changingVisibility &&
       oldData.status === 'waiting' &&
       data.status === 'approved' &&
-      oldData.pid
+      (oldData.pid ||
+        (isPrivate(newData[0]) &&
+          newData[0].private_user_a != null &&
+          newData[0].private_user_b != null))
     ) {
-      let pComment = await this.modelInstance.select({
-        objectId: oldData.pid,
-      });
+      let pComment = oldData.pid
+        ? await this.modelInstance.select({
+            objectId: oldData.pid,
+          })
+        : [];
 
       [pComment] = pComment;
 
       let pUser;
 
-      if (pComment.user_id) {
+      if (pComment?.user_id) {
         pUser = await this.getModel('Users').select({
           objectId: pComment.user_id,
         });
@@ -727,16 +747,30 @@ module.exports = class CommentController extends BaseRest {
       }
 
       const notify = this.service('notify', this);
-      const pcmtReturn = await formatCmt(
-        pComment,
-        { ...this.config(), deprecated: this.ctx.state.deprecated },
-        userInfo,
-        pUser ? [pUser] : [],
-      );
+      const pcmtReturn = pComment
+        ? await formatCmt(
+            pComment,
+            { ...this.config(), deprecated: this.ctx.state.deprecated },
+            userInfo,
+            pUser ? [pUser] : [],
+          )
+        : undefined;
 
       await notify.run(
-        { ...cmtReturn, mail: newData[0].mail },
-        { ...pcmtReturn, mail: pComment.mail },
+        {
+          ...cmtReturn,
+          mail: newData[0].mail,
+          private_user_a: newData[0].private_user_a,
+          private_user_b: newData[0].private_user_b,
+        },
+        pcmtReturn
+          ? {
+              ...pcmtReturn,
+              mail: pComment.mail,
+              private_user_a: pComment.private_user_a,
+              private_user_b: pComment.private_user_b,
+            }
+          : undefined,
         true,
       );
     }
@@ -1049,6 +1083,25 @@ module.exports = class CommentController extends BaseRest {
           field: ['display_name', 'email', 'url', 'type', 'avatar', 'label'],
         },
       );
+    }
+
+    const levels = levelSettings.read(this.config('levels'));
+    if (levels.enabled && comments.length) {
+      const conditions = {};
+      if (user_ids.length) conditions.user_id = ['IN', user_ids];
+      const mails = [...new Set(comments.map((row) => row.mail).filter(Boolean))];
+      if (mails.length) conditions.mail = ['IN', mails];
+      const counts = Object.keys(conditions).length
+        ? await this.modelInstance.count(
+            {
+              status: ['NOT IN', ['waiting', 'spam']],
+              ...(this.config('storage') === 'mysql' ? { visibility: 'public' } : {}),
+              _complex: { ...conditions, _logic: 'or' },
+            },
+            { group: ['user_id', 'mail'] },
+          )
+        : [];
+      levelSettings.apply(comments, counts || [], levels);
     }
 
     return Promise.all(

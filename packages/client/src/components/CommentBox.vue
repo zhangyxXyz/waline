@@ -87,11 +87,11 @@ const draftKey = props.edit
   ? `edit:${props.edit.objectId}`
   : props.replyId
     ? `reply:${props.replyId}`
-    : '';
+    : 'root';
 const restoredDraft = draftKey ? draftStore?.get(draftKey) : undefined;
 const draft = reactive(
   restoredDraft || {
-    text: '',
+    text: props.edit || props.replyId ? '' : savedEditor.value,
     privateSelected: false,
     visibility: props.edit?.visibility || 'public',
   },
@@ -164,13 +164,19 @@ const privateChoice = computed({
   },
 });
 const editor = computed({
-  get: () =>
-    props.edit || props.replyId || isPrivate.value ? privateDraft.value : savedEditor.value,
+  get: () => privateDraft.value,
   set: (value: string) => {
-    if (props.edit || props.replyId || isPrivate.value) privateDraft.value = value;
-    else savedEditor.value = value;
+    privateDraft.value = value;
   },
 });
+// Visibility changes never swap the draft. Only public root drafts may persist.
+watch(
+  [editor, isPrivate],
+  ([text, privateMode]) => {
+    if (!props.edit && !props.replyId) savedEditor.value = privateMode ? '' : text;
+  },
+  { immediate: true, flush: 'sync' },
+);
 const userMeta = useUserMeta();
 
 const inputRefs = ref<Record<string, HTMLInputElement>>({});
@@ -472,7 +478,7 @@ const submitComment = async (): Promise<void> => {
     // oxlint-disable-next-line typescript/no-non-null-assertion
     emit('submit', response.data!);
 
-    if (draftKey) draftStore?.delete(draftKey);
+    if (props.edit || props.replyId) draftStore?.delete(draftKey);
 
     editor.value = '';
 

@@ -50,6 +50,15 @@ export default function SmtpSettings({ onDirty }) {
           <label className="waline-setting-check">
             <input
               type="checkbox"
+              checked={data.authorNotify}
+              onChange={(e) => edit('authorNotify', e.target.checked)}
+            />{' '}
+            {t('smtp.authorNotify')}
+          </label>
+          <p>{t('smtp.authorNotifyTip')}</p>
+          <label className="waline-setting-check">
+            <input
+              type="checkbox"
               checked={data.useEnvironment}
               onChange={(e) => edit('useEnvironment', e.target.checked)}
             />{' '}

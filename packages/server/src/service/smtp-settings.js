@@ -2,10 +2,12 @@ const store = require('./dashboard-settings.js');
 
 const read = () => {
   const saved = store.read().smtp;
-  if (saved && saved.useEnvironment === false) return saved;
+  const authorNotify = saved?.authorNotify ?? !process.env.DISABLE_AUTHOR_NOTIFY;
+  if (saved && saved.useEnvironment === false) return { ...saved, authorNotify };
   const { env } = process;
   return {
     useEnvironment: true,
+    authorNotify,
     enabled: Boolean(env.SMTP_HOST || env.SMTP_SERVICE),
     host: env.SMTP_HOST || '',
     service: env.SMTP_SERVICE || '',
@@ -24,8 +26,12 @@ const publicSettings = () => {
 };
 const save = (value) => {
   if (!value || typeof value.useEnvironment !== 'boolean') throw store.invalid();
+  if (value.authorNotify !== undefined && typeof value.authorNotify !== 'boolean') {
+    throw store.invalid();
+  }
+  const authorNotify = value.authorNotify ?? read().authorNotify;
   if (value.useEnvironment) {
-    store.save('smtp', { useEnvironment: true });
+    store.save('smtp', { useEnvironment: true, authorNotify });
     return publicSettings();
   }
   if (
@@ -39,6 +45,7 @@ const save = (value) => {
   }
   const next = {
     useEnvironment: false,
+    authorNotify,
     enabled: value.enabled,
     secure: value.secure,
     port: value.port,
