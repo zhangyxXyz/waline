@@ -522,7 +522,14 @@ module.exports = class NotifyService extends think.Service {
     const recipient = accounts.find(
       (user) => ids.some((id) => same(id, user.objectId)) && !same(user.objectId, comment.user_id),
     );
-    if (!active(sender) || !active(recipient) || !this.realEmail(recipient.email)) return;
+    if (!active(sender) || !active(recipient)) return;
+    // Account IDs still authorize the conversation. For an administrator,
+    // deliver to the same configured inbox used by public owner notifications.
+    const to =
+      recipient.type === 'administrator'
+        ? smtpSettings.read().authorEmail || recipient.email
+        : recipient.email;
+    if (!this.realEmail(to)) return;
     // Do not quote a parent whose audience has changed or cannot be verified.
     if (
       parent &&
@@ -536,7 +543,7 @@ module.exports = class NotifyService extends think.Service {
     const config = think.config();
     await this.mail(
       {
-        to: recipient.email,
+        to,
         templateKind: parent ? 'reply' : 'admin',
         title: parent
           ? config.mailSubject || 'MAIL_SUBJECT'

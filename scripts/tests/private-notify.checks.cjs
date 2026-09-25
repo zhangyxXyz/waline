@@ -66,6 +66,32 @@ test('private continuations notify the other participant, including replies to o
     assert.equal(sent[0][0].templateKind, 'reply');
   }
 });
+
+test('private owner notifications share the configured public inbox, while ordinary recipients keep their account email', async () => {
+  const previous = process.env.AUTHOR_EMAIL;
+  process.env.AUTHOR_EMAIL = 'notifications@example.test';
+  try {
+    for (const parent of [undefined, comment]) {
+      const { service, sent } = fixture();
+      await service.run(comment, parent);
+      assert.equal(sent.length, 1);
+      assert.equal(sent[0][0].to, 'notifications@example.test');
+      await service.run({ ...comment, user_id: 2 }, parent);
+      assert.equal(sent.length, 2);
+      assert.equal(sent[1][0].to, 'a@example.test');
+    }
+    const inactive = fixture([users[0], { ...users[1], type: 'banned' }]);
+    await inactive.service.run(comment);
+    assert.equal(inactive.sent.length, 0);
+    process.env.AUTHOR_EMAIL = 'invalid';
+    const invalid = fixture();
+    await invalid.service.run(comment);
+    assert.equal(invalid.sent.length, 0);
+  } finally {
+    if (previous === undefined) delete process.env.AUTHOR_EMAIL;
+    else process.env.AUTHOR_EMAIL = previous;
+  }
+});
 test('pending/spam, missing audiences, inactive users and undeliverable addresses never receive private mail', async () => {
   for (const extra of [
     { status: 'waiting' },

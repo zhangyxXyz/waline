@@ -117,5 +117,5 @@
   "download.validating": "Validating…",
   "download.reason": "Failure details",
   "smtp.authorNotify": "Email the author about new comments",
-  "smtp.authorNotifyTip": "Send public comments (including pending moderation) to the author mailbox. Approved private comments notify the other participant, including the author, independently of this switch. All mail requires enabled SMTP."
+  "smtp.authorNotifyTip": "Send public comments (including pending moderation) to the author mailbox. Approved private comments notify the other participant independently of this switch. Private mail to the author uses the same notification recipient, falling back to the author's account email when unset. All mail requires enabled SMTP."
 }
