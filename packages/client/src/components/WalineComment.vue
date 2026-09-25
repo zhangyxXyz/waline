@@ -32,10 +32,14 @@ const totalPages = ref(0);
 
 const config = computed(() => getConfig(props as WalineProps));
 const draftStore = createDraftStore();
+let contextVersion = 0;
 provide(draftStoreKey, draftStore);
 watch(
   () => [config.value.serverURL, config.value.path, userInfo.value.token],
-  () => draftStore.clear(),
+  () => {
+    contextVersion += 1;
+    draftStore.clear();
+  },
   { flush: 'sync' },
 );
 onUnmounted(() => draftStore.clear());
@@ -54,7 +58,7 @@ useStyleTag(darkmodeStyle, { id: 'waline-darkmode' });
 
 let abort: (() => void) | null = null;
 
-const getCommentData = (pageNumber: number): void => {
+const getCommentData = (pageNumber: number, replace = false): void => {
   const { serverURL, path, pageSize } = config.value;
   const controller = new AbortController();
 
@@ -62,18 +66,24 @@ const getCommentData = (pageNumber: number): void => {
 
   abort?.();
 
-  getComment({
+  const options = {
     serverURL,
     lang: config.value.lang,
     path,
     pageSize,
     sortBy: sortKeyMap[commentSortingRef.value],
-    page: pageNumber,
     signal: controller.signal,
     token: userInfo.value.token,
-  })
-    .then((resp) => {
+  };
+  // Reload the visible pages after mutations: counts, levels and cascaded
+  // deletions are authoritative on the server, including private visibility.
+  const pages = replace
+    ? Array.from({ length: pageNumber }, (_, index) => index + 1)
+    : [pageNumber];
+  Promise.all(pages.map((page) => getComment({ ...options, page })))
+    .then((responses) => {
       if (controller.signal.aborted) return;
+      const [resp] = responses;
       status.value = 'success';
       count.value = resp.count;
       serviceClosed.value = Boolean(resp.closed);
@@ -82,8 +92,10 @@ const getCommentData = (pageNumber: number): void => {
         reply.value = null;
         edit.value = null;
       }
-      data.value.push(...resp.data);
-      page.value = pageNumber;
+      const comments = responses.flatMap((response) => response.data);
+      if (replace) data.value = comments;
+      else data.value.push(...comments);
+      page.value = Math.min(pageNumber, Math.max(1, resp.totalPages));
       totalPages.value = resp.totalPages;
     })
     // oxlint-disable-next-line promise/prefer-await-to-callbacks
@@ -145,15 +157,16 @@ const onSubmit = (comment: WalineComment): void => {
   } else if ('rid' in comment) {
     const repliedComment = data.value.find(({ objectId }) => objectId === comment.rid);
 
-    if (!repliedComment) return;
-
-    if (!Array.isArray(repliedComment.children)) repliedComment.children = [];
-
-    repliedComment.children.push(comment);
+    if (repliedComment) {
+      if (!Array.isArray(repliedComment.children)) repliedComment.children = [];
+      repliedComment.children.push(comment);
+    }
+    count.value += 1;
   } else {
     data.value.unshift(comment);
     count.value += 1;
   }
+  getCommentData(page.value, true);
 };
 
 const onStatusChange = async ({
@@ -198,32 +211,34 @@ const onDelete = async ({ objectId }: WalineComment): Promise<void> => {
   if (!confirm('Are you sure you want to delete this comment?')) return;
 
   const { serverURL, lang } = config.value;
+  const version = contextVersion;
 
-  await deleteComment({
-    serverURL,
-    lang,
-    token: userInfo.value.token,
-    objectId,
-  });
-
-  // delete comment from data
-  data.value.some((item, index) => {
-    if (item.objectId === objectId) {
-      data.value = data.value.filter((_item, i) => i !== index);
-
-      return true;
-    }
-
-    return item.children.some((child, childIndex) => {
-      if (child.objectId === objectId) {
-        data.value[index].children = item.children.filter((_item, i) => i !== childIndex);
-
-        return true;
-      }
-
-      return false;
+  try {
+    await deleteComment({
+      serverURL,
+      lang,
+      token: userInfo.value.token,
+      objectId,
     });
-  });
+    if (version !== contextVersion) return;
+
+    const removed = (comment: WalineComment): boolean =>
+      comment.objectId === objectId ||
+      ('pid' in comment && (comment.pid === objectId || comment.rid === objectId));
+    for (const root of data.value) {
+      for (const comment of [root, ...(root.children || [])]) {
+        if (removed(comment)) {
+          draftStore.delete(`edit:${comment.objectId}`);
+          draftStore.delete(`reply:${comment.objectId}`);
+        }
+      }
+    }
+    if (reply.value && removed(reply.value)) reply.value = null;
+    if (edit.value && removed(edit.value)) edit.value = null;
+    getCommentData(page.value, true);
+  } catch (err: unknown) {
+    if (version === contextVersion) config.value.notify((err as Error).message);
+  }
 };
 
 const onLike = async (comment: WalineComment): Promise<void> => {
@@ -297,6 +312,7 @@ onMounted(async () => {
   );
 });
 onUnmounted(() => {
+  contextVersion += 1;
   abort?.();
 });
 </script>
